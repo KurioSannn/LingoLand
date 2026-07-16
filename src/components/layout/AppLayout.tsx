@@ -37,7 +37,7 @@ export function AppLayout() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <NavLink to="/app/home" className="brand" aria-label="Lingoland beranda">
+        <NavLink to="/" className="brand" aria-label="Kembali ke landing Lingoland">
           <span className="brand-mark">L</span>
           <span className="brand-name">Lingoland</span>
         </NavLink>

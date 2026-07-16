@@ -282,7 +282,7 @@ export function LandingPage() {
             <p className="mt-5 max-w-xl text-lg leading-8 text-neutral-500">
               Jelajahi satu room, dekati karakter, dan mulai percakapan terarah. Kamu bisa berjalan dengan keyboard atau kontrol sentuh, bertemu NPC, dan menyelesaikan misi speaking.
             </p>
-            <Link to="/app/world" className="landing-pill-cta mt-8">
+            <Link to="/login" className="landing-pill-cta mt-8">
               <span><ChevronDown size={22} /></span>
               COBA MINI HOME
             </Link>
