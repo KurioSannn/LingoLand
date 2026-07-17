@@ -15,7 +15,8 @@ import { Badge } from "../components/ui/Badge";
 import { Card } from "../components/ui/Card";
 import { FriendAvatar } from "../components/ui/FriendAvatar";
 import { Reveal } from "../components/ui/Reveal";
-import { defaultAvatar, friends, npcs, storeItems } from "../data/demoData";
+import { LandingAvatarScene } from "../components/three/LandingAvatarScene";
+import { DEMO_EMAIL, friends, npcs, storeItems } from "../data/demoData";
 import { formatCoins } from "../lib/game";
 import { useDismissable } from "../hooks/useDismissable";
 import type { AvatarConfig } from "../types";
@@ -138,7 +139,6 @@ export function LandingPage() {
         </header>
 
         <div className="landing-hero-inner">
-          <p className="landing-kicker">LINGOLAND HERE</p>
           <h1 className="sr-only">Lingoland, latihan speaking bahasa Inggris berbasis avatar dan Mini Home.</h1>
           <div className="landing-superword" aria-hidden>
             <div className="landing-superword-track">
@@ -152,12 +152,12 @@ export function LandingPage() {
               <span>Berani<br />bicara<br />hari ini</span>
             </div>
             <div className="landing-speech">
-              Want to practice English?
+              <span>Want to practice English?</span>
             </div>
             <div className="landing-avatar-wrap">
               <div className="landing-avatar-pop">
                 <div className="landing-avatar-bob">
-                  <AvatarFigure avatar={defaultAvatar} size="large" label="Avatar utama Lingoland" />
+                  <LandingAvatarScene />
                 </div>
               </div>
             </div>
@@ -354,18 +354,53 @@ export function LandingPage() {
       </section>
 
       <footer className="landing-footer">
-        <div className="page-shell flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
-          <div>
+        <div className="page-shell grid gap-10 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr]">
+          <div className="max-w-sm">
             <p className="landing-logo">
               <span>LINGO</span>
               <strong>LAND</strong>
             </p>
-            <p className="mt-3 text-sm font-semibold opacity-80">Berani Bicara, Satu Percakapan Sekaligus.</p>
+            <p className="mt-4 text-sm font-semibold leading-6 opacity-80">
+              Berani Bicara, Satu Percakapan Sekaligus. Prototype latihan speaking berbasis avatar dan Mini Home.
+            </p>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-wide opacity-60">
+              Progress demo disimpan lokal di browser.
+            </p>
           </div>
-          <div className="text-sm opacity-70">
-            <p>Prototype MVP — progress disimpan secara lokal di browser.</p>
-            <p className="mt-1">Multiplayer dan voice room belum tersedia.</p>
+
+          <div>
+            <h2 className="text-sm font-black uppercase tracking-wide">Navigasi</h2>
+            <nav className="mt-4 flex flex-col gap-3 text-sm font-semibold opacity-80" aria-label="Navigasi footer">
+              <a href="#hero" className="transition hover:opacity-100">Landing</a>
+              <a href="#benefit" className="transition hover:opacity-100">Benefit</a>
+              <a href="#karakter" className="transition hover:opacity-100">Karakter</a>
+              <a href="#mini-home" className="transition hover:opacity-100">Mini Home</a>
+            </nav>
           </div>
+
+          <div>
+            <h2 className="text-sm font-black uppercase tracking-wide">Demo</h2>
+            <div className="mt-4 rounded-md border border-white/15 p-4 text-sm">
+              <p className="font-semibold opacity-70">Email</p>
+              <p className="mt-1 break-all font-bold">{DEMO_EMAIL}</p>
+              <Link to="/login" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-white px-4 text-sm font-black text-[#160d2d] transition hover:bg-primary-50">
+                Masuk Demo
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-black uppercase tracking-wide">Status MVP</h2>
+            <ul className="mt-4 flex flex-col gap-3 text-sm font-semibold opacity-80">
+              <li>NPC adalah simulasi.</li>
+              <li>Multiplayer belum tersedia.</li>
+              <li>Backend dan Supabase belum terhubung.</li>
+              <li>Voice room real-time belum tersedia.</li>
+            </ul>
+          </div>
+        </div>
+        <div className="page-shell border-t border-white/10 py-5 text-xs font-semibold uppercase tracking-wide opacity-60">
+          Lingoland MVP Prototype. Dibuat untuk demo produk dan validasi core flow.
         </div>
       </footer>
     </main>
