@@ -58,7 +58,7 @@
   }
 
   .brand-mark {
-    @apply grid h-9 w-9 place-items-center rounded-md bg-primary-500 text-sm font-bold text-white;
+    @apply h-9 w-9 shrink-0 rounded-md object-contain;
   }
 
   .desktop-nav {
