@@ -1,4 +1,4 @@
-import { CheckCircle2, Coins, Flame, Heart, LogOut, Pencil, RotateCcw } from "lucide-react";
+import { CheckCircle2, Coins, Flame, Heart, LogOut, MessageCircle, Pencil, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AvatarFigure } from "../components/ui/AvatarFigure";
@@ -92,6 +92,20 @@ export function ProfilePage() {
         </Card>
 
         <div className="flex flex-col gap-6 lg:col-span-4">
+          <Card>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-neutral-950">Ngobrol dengan Avatar</h2>
+                <p className="mt-1 text-sm text-neutral-500">Latihan ngobrol bebas dalam bahasa Inggris, ditenagai AI.</p>
+              </div>
+              <Badge tone="prototype">Segera Hadir</Badge>
+            </div>
+            <Button variant="secondary" className="mt-4 w-full" onClick={() => navigate("/app/avatar-chat")}>
+              <MessageCircle size={16} aria-hidden />
+              Buka Percakapan
+            </Button>
+          </Card>
+
           <Card>
             <h2 className="text-lg font-bold text-neutral-950">Misi Selesai</h2>
             {completedMissions.length > 0 ? (

@@ -116,7 +116,7 @@ export function StorePage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-        <div className="card">
+        <div className="card min-w-0">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h2 className="text-xl font-bold text-neutral-950">Produk</h2>

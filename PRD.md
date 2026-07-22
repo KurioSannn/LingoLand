@@ -198,6 +198,35 @@ Klarifikasi scope: **Learning Path** dan **World/Mini Home** adalah dua fitur ya
 - `styles.css`: `.brand-mark` disesuaikan dari `span` teks jadi `img` (`object-contain`, ukuran tetap `h-9 w-9`).
 - **Belum diubah:** wordmark teks "LINGO/LAND" di landing page (`LandingPage.tsx`, class `.landing-logo`) — itu treatment tipografi yang sengaja dibuat beda, bukan logo mark yang sama. Kalau mau diseragamkan juga pakai `logo.png`, perlu konfirmasi karena itu ubah desain hero landing page.
 
+### Blok 18 — Halaman Top Up Koin (Preview, Belum Ada Payment Gateway)
+
+PRD Out of Scope eksplisit melarang **Payment gateway** dan **Subscription**. Blok ini menambah preview UI-nya saja, bukan transaksi sungguhan — konsisten dengan aturan "jangan membuat tombol palsu yang terlihat aktif tetapi tidak melakukan apa pun" (tombol beli memang terlihat, tapi jelas disabled dan berlabel jujur).
+
+- `pages/TopUpPage.tsx` (baru), route `/app/topup`: 4 paket koin mock (harga ilustratif, badge promo seperti "Paling Laris"/"Hemat Maksimal"), tombol beli **disabled** berlabel "Segera Hadir", disclaimer eksplisit bahwa payment gateway belum ada, plus link balik ke cara dapat koin sungguhan (misi di Belajar / lesson di Learning Path).
+- `components/layout/AppLayout.tsx`: balance koin di header (yang tadinya `<span>` statis) diganti jadi `<button>` yang navigate ke `/app/topup`.
+- `styles.css`: tambah `.balance-button` (hover/cursor state) untuk balance yang sekarang clickable.
+- Output blok: user bisa lihat preview monetisasi tanpa produk mengklaim fitur yang belum ada.
+
+### Blok 19 — Avatar Chat (Scaffold Gemini via Supabase Edge Function, Belum Aktif)
+
+PRD Out of Scope eksplisit melarang **LLM integration** dan section "Mission Evaluation" bilang *"Tidak perlu AI. Gunakan rule-based keyword matching."* Ini keputusan sadar untuk mulai menyiapkan fondasi AI companion chat **di luar** sistem evaluasi misi yang sudah ada (rule-based evaluator di World/Mini Home tidak disentuh) — mirip keputusan Supabase di Blok 11, dicatat sebagai evolusi Post-MVP, bukan diam-diam mengubah PRD.
+
+Fitur ini terpisah dari NPC misi (Bintang/Lala/Benny) — ini "ngobrol bebas" dengan avatar milik pemain sendiri, diakses dari Profile, bukan dari Mini Home.
+
+**Kenapa perlu Edge Function, bukan panggil Gemini langsung dari browser:** app ini SPA murni tanpa server sendiri. Supabase anon key aman ditaruh di frontend karena dilindungi RLS — API key Gemini TIDAK didesain untuk publik; kalau ditaruh di `VITE_*` env var, key itu ke-bundle ke JS publik dan bisa dicuri siapa saja. Edge Function menyimpan key sebagai Supabase secret di server, frontend cuma manggil endpoint function-nya.
+
+- `supabase/functions/avatar-chat/index.ts` (baru): Deno Edge Function, terima riwayat pesan, panggil Gemini API pakai `GEMINI_API_KEY` dari Supabase secret, punya system prompt persona "teman latihan speaking yang suportif". **Belum di-deploy** — baru scaffold di repo.
+- `src/lib/avatarChatClient.ts` (baru): client helper `sendAvatarChatMessage()` yang manggil Edge Function via `supabase.functions.invoke`. Kalau function belum di-deploy/key belum diset, fallback ke pesan jujur *"Fitur ngobrol AI belum aktif..."* — bukan pura-pura jawab atau crash.
+- `pages/AvatarChatPage.tsx` (baru), route `/app/avatar-chat`: chat UI penuh (avatar player + riwayat pesan + input), badge "Segera Hadir", penjelasan bahwa backend proxy sudah disiapkan tapi menunggu API key.
+- `pages/ProfilePage.tsx`: card baru "Ngobrol dengan Avatar" dengan CTA ke halaman chat.
+- Tidak menyentuh `tsconfig.app.json` scope (`include: ["src"]`) — kode Deno di `supabase/functions/` sengaja di luar typecheck Vite.
+- Output blok: struktur/UI lengkap dan teruji (dicoba end-to-end lewat Playwright — kirim pesan, dapat fallback jujur, nol crash), AI beneran aktif menunggu dua langkah manual:
+
+**Prasyarat manual buat mengaktifkan (belum dikerjakan):**
+
+1. `supabase secrets set GEMINI_API_KEY=<key-kamu>` di project Supabase yang sama.
+2. `supabase functions deploy avatar-chat` (butuh Supabase CLI + login).
+
 ## Context
 
 Kembangkan MVP web bernama **Lingoland**, yaitu platform latihan speaking bahasa Inggris berbasis avatar dan virtual room.

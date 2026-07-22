@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
+import { AvatarChatPage } from "./pages/AvatarChatPage";
 import { AvatarPage } from "./pages/AvatarPage";
 import { FriendsPage } from "./pages/FriendsPage";
 import { HomePage } from "./pages/HomePage";
@@ -11,6 +12,7 @@ import { LessonsPage } from "./pages/LessonsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { StorePage } from "./pages/StorePage";
+import { TopUpPage } from "./pages/TopUpPage";
 import { WorldPage } from "./pages/WorldPage";
 
 export function App() {
@@ -34,9 +36,11 @@ export function App() {
         <Route path="lessons" element={<LessonsPage />} />
         <Route path="lessons/:unitId" element={<LessonPage />} />
         <Route path="avatar" element={<AvatarPage />} />
+        <Route path="avatar-chat" element={<AvatarChatPage />} />
         <Route path="world" element={<WorldPage />} />
         <Route path="friends" element={<FriendsPage />} />
         <Route path="store" element={<StorePage />} />
+        <Route path="topup" element={<TopUpPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -129,7 +129,7 @@ export function AvatarPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_0.95fr]">
-        <div className="card">
+        <div className="card min-w-0">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold text-neutral-950">Preview Avatar</h2>
@@ -150,7 +150,7 @@ export function AvatarPage() {
           </div>
         </div>
 
-        <div className="card">
+        <div className="card min-w-0">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold text-neutral-950">Pilihan Item</h2>

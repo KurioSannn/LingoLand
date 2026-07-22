@@ -15,6 +15,7 @@ export function LowPolyAvatar({
   name,
   active = false,
   walking = false,
+  talking = false,
 }: {
   avatar: AvatarConfig;
   position?: [number, number, number];
@@ -22,12 +23,14 @@ export function LowPolyAvatar({
   name?: string;
   active?: boolean;
   walking?: boolean;
+  talking?: boolean;
 }) {
   const groupRef = useRef<Group>(null);
   const leftArmRef = useRef<Mesh>(null);
   const rightArmRef = useRef<Mesh>(null);
   const leftLegRef = useRef<Mesh>(null);
   const rightLegRef = useRef<Mesh>(null);
+  const mouthRef = useRef<Mesh>(null);
 
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
@@ -47,6 +50,15 @@ export function LowPolyAvatar({
     if (rightArmRef.current) rightArmRef.current.rotation.x = -swing;
     if (leftLegRef.current) leftLegRef.current.rotation.x = -swing * 0.8;
     if (rightLegRef.current) rightLegRef.current.rotation.x = swing * 0.8;
+
+    // Talking: mulut "flap" cepat dan tidak teratur (mix dua frekuensi) supaya
+    // terasa seperti mengucapkan suku kata, bukan buka-tutup metronom.
+    if (mouthRef.current) {
+      const flap = talking
+        ? Math.abs(Math.sin(time * 13) * 0.6 + Math.sin(time * 21) * 0.4)
+        : 0;
+      mouthRef.current.scale.y = 0.25 + flap * 0.9;
+    }
   });
 
   return (
@@ -54,6 +66,10 @@ export function LowPolyAvatar({
       <mesh position={[0, 1.55, 0]} castShadow>
         <sphereGeometry args={[0.28, 16, 16]} />
         <meshStandardMaterial color={colorFor(avatar.skinToneId)} roughness={0.8} />
+      </mesh>
+      <mesh ref={mouthRef} position={[0, 1.44, 0.245]}>
+        <boxGeometry args={[0.1, 0.05, 0.02]} />
+        <meshStandardMaterial color="#27262D" />
       </mesh>
       <mesh position={[0, 1.76, -0.03]} castShadow>
         <boxGeometry args={[0.5, 0.22, 0.42]} />

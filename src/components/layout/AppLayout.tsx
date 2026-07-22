@@ -52,10 +52,16 @@ export function AppLayout() {
         </nav>
 
         <div className="header-actions">
-          <span className="balance" aria-label={`${formatCoins(currentUser.coins)} koin`} title="Koin demo">
+          <button
+            type="button"
+            className="balance balance-button"
+            aria-label={`${formatCoins(currentUser.coins)} koin. Buka halaman top up koin.`}
+            title="Top up koin"
+            onClick={() => navigate("/app/topup")}
+          >
             <Coins size={18} className="text-coin" aria-hidden />
             {formatCoins(currentUser.coins)}
-          </span>
+          </button>
           <span className="balance balance-heart" aria-label={`${currentUser.hearts} heart`} title="Heart">
             <Heart size={18} className="text-heart" aria-hidden />
             {currentUser.hearts}
