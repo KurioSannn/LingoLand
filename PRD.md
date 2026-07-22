@@ -102,6 +102,102 @@ Untuk pengerjaan MVP pertama, implementasi dibagi menjadi sepuluh blok kecil aga
 
 Setelah Blok 1-10 selesai, baru lanjut ke polish MVP: responsive QA, accessibility QA, README final, visual polish, GLB asset pipeline, dan persiapan backend/realtime.
 
+## Implementasi Post-MVP
+
+Blok 11 ke atas ada di luar scope MVP awal (lihat "Out of Scope"). Ini disepakati ulang untuk menyiapkan versi berikutnya yang menggantikan localStorage dengan backend nyata, dimulai dari Supabase.
+
+### Blok 11 — Supabase Foundation (Auth dan Data Sync)
+
+- Tambah dependency `@supabase/supabase-js`.
+- `src/lib/supabaseClient.ts`: client Supabase, nullable/opsional lewat `isSupabaseConfigured` (fallback ke localStorage kalau env kosong).
+- `.env.example` dan `.env` untuk `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`.
+- `supabase/schema.sql`: tabel `profiles`, `avatar_configs`, `inventory_items`, `mission_progress`, `claimed_rewards` (keyed ke `auth.users.id`), dengan RLS owner-only.
+- Konten misi (mission/objective/keyword/reward) tetap hardcoded di `src/data/demoData.ts` — tidak dipindah ke DB.
+- `src/lib/supabaseAuth.ts`: sign-in email/password, self-heal sign-up khusus akun demo, sign-out.
+- `src/lib/supabaseSync.ts`: fetch/push/clear remote state per user.
+- `demoReducer.ts`: action `HYDRATE_REMOTE` untuk merge data remote ke state lokal.
+- `DemoContext.tsx`: efek sync ke Supabase yang di-serialize (in-flight + dirty flag) supaya push tidak saling tumpang tindih; kegagalan sync tampil lewat `storageMeta`.
+- `useDemoAuth.ts`: login/logout/reset jadi async, hydrate dari remote setelah sign-in.
+- Output blok: akun demo login lewat Supabase Auth, progress (user, avatar, inventory, mission progress, claimed rewards) tersinkron ke Postgres, localStorage tetap jalan sebagai fallback offline.
+
+**Prasyarat manual di dashboard Supabase (belum otomatis dari kode):**
+
+- Jalankan `supabase/schema.sql` di SQL Editor.
+- Matikan "Confirm email" di Authentication > Providers > Email, supaya akun demo (`demo@lingoland.app`) tidak butuh klik link konfirmasi.
+
+**Status:** kode selesai, lint/typecheck/build hijau. Verifikasi manual end-to-end (login demo → avatar → mission → reload dari device lain) belum dijalankan — menunggu dua prasyarat dashboard di atas.
+
+### Blok 12 — Auth Session Sync
+
+Sekarang `DemoContext` hanya tahu status login dari mirror `localStorage`, bukan dari sesi Supabase yang sebenarnya. Kalau token Supabase expired, direvoke, atau di-signout dari tab/device lain, app tetap menganggap user login sampai ada write yang gagal.
+
+- Pasang `supabase.auth.onAuthStateChange` di `DemoContext` atau hook baru `useSupabaseSession`.
+- Saat event `SIGNED_OUT` atau token refresh gagal: dispatch `LOGOUT`, bersihkan mirror lokal yang relevan.
+- Saat event `TOKEN_REFRESHED`/`SIGNED_IN` dari sesi yang masih valid saat reload: pastikan `state.user.id` tetap konsisten dengan `session.user.id` (bukan cuma dari mirror localStorage).
+- Loading indicator saat context masih menunggu status sesi awal dari Supabase (`supabase.auth.getSession()`) sebelum menentukan render login vs protected route.
+- Output blok: status login di UI selalu sinkron dengan sesi Supabase yang valid, bukan cuma tebakan dari localStorage.
+
+**Status:** selesai. `resolveHydratePayload` diekstrak ke `supabaseSync.ts` supaya dipakai bareng oleh `useDemoAuth` (login) dan listener sesi baru (tanpa duplikasi logic). `DemoContext` sekarang expose `isSessionChecked`; `ProtectedRoute` menahan render sampai sesi awal selesai dicek, supaya tidak ada flash render protected page atau redirect keliru sebelum status sesi Supabase diketahui. Lint/typecheck/build hijau. Verifikasi manual (matikan wifi, expire token, signout dari tab lain) belum dijalankan.
+
+### Blok 13 — Reset Progress Lifecycle Fix
+
+Bug yang sudah diketahui dari Blok 11: setelah **Reset Progress Demo**, `user.id` di state lokal balik ke `"demo-user"` (default lokal), sehingga `isRemoteBacked()` jadi `false` walau sesi Supabase user itu masih aktif. Akibatnya perubahan berikutnya (avatar baru, misi baru) **berhenti tersinkron ke Supabase** sampai user logout-login ulang.
+
+- Setelah `clearRemoteState` + dispatch `RESET_PROGRESS`, re-seed baris remote (`profiles`, `avatar_configs`, dst) dengan `user.id` Supabase yang masih aktif, bukan `"demo-user"`.
+- Pastikan `HYDRATE_REMOTE` dipanggil ulang (atau state di-patch langsung) supaya `user.id` tetap uuid Supabase pasca-reset.
+- Tambah test manual: reset progress → ubah avatar → reload → avatar baru harus tetap ada (bukan balik ke sebelum reset).
+- Output blok: reset progress tidak memutus sinkronisasi Supabase selama sesi masih aktif.
+
+**Status:** selesai. `resetProgress` di `useDemoAuth.ts` sekarang dispatch `HYDRATE_REMOTE` ulang dengan uuid Supabase setelah `RESET_PROGRESS`, supaya efek sync di `DemoContext` tetap aktif pasca-reset. Lint/typecheck/build hijau. Test manual (poin ketiga di atas) belum dijalankan.
+
+### Blok 14 — Loading dan Error State Supabase di UI
+
+`isSyncing` dari `useDemoAuth` dan `storageMeta` dari `useDemoStorage` sudah ada di data layer, tapi belum dipakai maksimal di semua tempat yang PRD wajibkan (loading state login, error state jelas kalau sync gagal).
+
+- `LoginPage`: pastikan spinner/disabled state jelas selama `isSyncing` (bukan cuma `isLoading` lokal).
+- `AvatarPage` dan `StorePage`: `storageMeta.status === "unavailable"` sudah dirender sebagai teks status — ubah jadi banner error yang eksplisit dan actionable ("Perubahan belum tersinkron ke server, coba lagi"), bukan cuma teks status mentah.
+- Tambah pesan spesifik untuk kasus RLS/permission error (401/403 dari Supabase) supaya beda dari sekadar offline.
+- Output blok: kegagalan sync Supabase terlihat jelas oleh user, sesuai requirement "Error state" di PRD, bukan silent fail di background.
+
+### Blok 15 — README dan Dokumentasi Supabase
+
+`README.md` belum diperbarui sejak Blok 11 menambah dependency dan env var baru — melanggar Documentation Requirements PRD ("Jika menambahkan environment variable, update README dan jelaskan setiap variable").
+
+- Tambah section "Setup Supabase" di README: cara isi `.env`, cara jalankan `supabase/schema.sql`, cara matikan "Confirm email".
+- Jelaskan bahwa konten misi tetap hardcoded, hanya data user/progress yang ada di Supabase.
+- Update bagian localStorage di README: jelaskan sekarang localStorage berfungsi sebagai mirror/fallback offline, bukan satu-satunya sumber data lagi (kalau Supabase dikonfigurasi).
+- Jalankan manual verification checklist penuh dari section "Verification" PRD dengan Supabase aktif.
+- Output blok: dokumentasi akurat mencerminkan state project setelah integrasi Supabase, siap untuk siapa pun yang clone repo dari awal.
+
+### Blok 16 — Learning Path sebagai Lesson Terpisah (Duolingo-style)
+
+Klarifikasi scope: **Learning Path** dan **World/Mini Home** adalah dua fitur yang beda, dengan **route web yang beda**, dan tidak saling mengunci satu sama lain.
+
+- `/app/learn` — khusus mission card (World/NPC), tidak berubah dari fitur asli Blok 6/10.
+- `/app/lessons` (baru) — halaman Learning Path sendiri: daftar bab bergaya kursus (Bab 1, 2, 3, ... — termasuk bab "Segera Hadir" supaya penomoran tetap jalan terus seiring nambah konten), masing-masing berupa card klik dengan status (Terbuka/Terkunci/Selesai/Segera Hadir) dan progress bar keseluruhan.
+- `/app/lessons/:unitId` (baru) — exercise runner per bab.
+- `/app/learn` punya banner CTA (bukan sekadar link kecil) yang mengarah ke `/app/lessons`, supaya Learning Path terasa sebagai fitur utama, bukan fitur sampingan.
+
+- `types.ts`: tambah `LessonUnit`, `LessonExercise`, `LessonExerciseType` (`"multiple-choice" | "word-order"`), `LessonChoiceOption`; `DemoState` tambah `completedLessonIds: string[]`.
+- `data/demoData.ts`: `lessonUnits` — 3 unit soal (`lesson-intro`, `lesson-hobby`, `lesson-weekend`), materi diambil dari kosakata misi yang sudah ada (`relatedMissionId` cuma label topik, bukan dependency gameplay). `learningPath` diganti dari `missionId` jadi `lessonUnitId`.
+- `state/selectors.ts`: `selectLessonUnitSummaries` — unlock linear murni dari `completedLessonIds` (unit N terbuka kalau unit N-1 selesai), independen dari `missionProgress`. `selectLearningPath` dirombak pakai ini, bukan status misi.
+- `state/demoReducer.ts`: action `COMPLETE_LESSON` — guard anti-klaim-ulang sama seperti `CLAIM_REWARD` (replay lesson diperbolehkan buat latihan, tapi XP cuma diberikan sekali).
+- `pages/LessonPage.tsx` (baru): exercise runner — progress bar per soal, feedback benar/salah dengan jawaban yang benar ditampilkan, layar completion dengan skor dan label "Latihan Ulang" kalau sudah pernah selesai (reward nol, konsisten sama aturan reward mission).
+- `pages/LessonsPage.tsx` (baru): halaman hub Learning Path — penomoran "Bab N" berjalan terus (termasuk bab coming-soon), progress ringkasan di header.
+- `pages/LearnPage.tsx`: hanya mission card + banner CTA prominent ke `/app/lessons`.
+- Reward lesson (`rewardXp: 15` per unit) sengaja lebih kecil dari reward mission (50/70/90 XP) supaya tidak bersaing dengan ekonomi reward utama — statusnya "persiapan sebelum misi", bukan pengganti misi.
+- Progress lesson **belum** disinkronkan ke Supabase (cuma di `DemoState` + localStorage mirror) — beda dari user/avatar/inventory/mission/reward yang sudah punya tabel sejak Blok 11. Kalau nanti mau disinkron juga, perlu tabel `lesson_progress` baru di `supabase/schema.sql`.
+- Output blok: Learning Path dan World jadi dua route dan dua halaman yang benar-benar terpisah, dihubungkan cuma lewat satu CTA banner.
+
+**Status:** selesai dan diverifikasi manual end-to-end via Playwright dua kali (setelah pemisahan route final): login demo → `/app/learn` (cuma mission card + banner) → klik "Buka Learning Path" → `/app/lessons` (Bab 1-5) → klik Bab 1 → jawab 2 soal pilihan ganda + 1 susun kata → 3/3 benar → +15 XP → kembali ke `/app/lessons` → Bab 1 "Selesai", Bab 2 otomatis "Terbuka". Mission card di `/app/learn` tidak berubah sama sekali. Nol console error di kedua run. Lint/typecheck/build hijau.
+
+### Blok 17 — Logo dan Favicon
+
+- `index.html`: tambah `<link rel="icon" type="image/png" href="/logo.png" />`.
+- `components/layout/AppLayout.tsx`: brand mark di app header (muncul di semua halaman `/app/*`, termasuk `/app/home`) diganti dari kotak huruf "L" jadi `<img src="/logo.png">`.
+- `styles.css`: `.brand-mark` disesuaikan dari `span` teks jadi `img` (`object-contain`, ukuran tetap `h-9 w-9`).
+- **Belum diubah:** wordmark teks "LINGO/LAND" di landing page (`LandingPage.tsx`, class `.landing-logo`) — itu treatment tipografi yang sengaja dibuat beda, bukan logo mark yang sama. Kalau mau diseragamkan juga pakai `logo.png`, perlu konfirmasi karena itu ubah desain hero landing page.
+
 ## Context
 
 Kembangkan MVP web bernama **Lingoland**, yaitu platform latihan speaking bahasa Inggris berbasis avatar dan virtual room.
