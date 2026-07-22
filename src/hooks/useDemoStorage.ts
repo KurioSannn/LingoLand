@@ -1,9 +1,12 @@
 import { useMemo } from "react";
-import { clearDemoState } from "../lib/storage";
 import { useDemo } from "../state/DemoContext";
 import { selectActiveMissionSummary, selectMissionSummaries, selectOwnedAvatarOptions, selectStateSnapshot, selectStoreItemSummaries } from "../state/selectors";
 import type { AvatarConfig } from "../types";
 
+// Resetting progress touches Supabase (clear remote rows, re-seed the still-active
+// session) — that lives solely in useDemoAuth.resetProgress so there is one path,
+// not two reset implementations that could drift (the old copy here only ever
+// cleared localStorage and never synced the Supabase side).
 export function useDemoStorage() {
   const { state, dispatch, storageMeta } = useDemo();
 
@@ -23,9 +26,5 @@ export function useDemoStorage() {
     saveAvatar: (avatar: AvatarConfig) => dispatch({ type: "SAVE_AVATAR", avatar }),
     buyItem: (itemId: string, price: number, itemName: string) => dispatch({ type: "BUY_ITEM", itemId, price, itemName }),
     addActivity: (message: string) => dispatch({ type: "ADD_ACTIVITY", message }),
-    resetProgress: () => {
-      clearDemoState();
-      dispatch({ type: "RESET_PROGRESS" });
-    },
   };
 }

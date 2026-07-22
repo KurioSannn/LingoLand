@@ -33,13 +33,13 @@ export function LoginPage() {
     }
   }, [isAuthenticated, navigate, redirectTo]);
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsLoading(true);
     setError("");
     setSuccess("");
 
-    const result = loginWithCredentials(email, password);
+    const result = await loginWithCredentials(email, password);
     setIsLoading(false);
 
     if (!result.ok) {
@@ -51,11 +51,18 @@ export function LoginPage() {
     navigate(redirectTo, { replace: true });
   }
 
-  function loginDemo() {
+  async function loginDemo() {
     setIsLoading(true);
     setError("");
-    const result = loginAsDemo();
+
+    const result = await loginAsDemo();
     setIsLoading(false);
+
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+
     setSuccess(result.message);
     navigate(redirectTo, { replace: true });
   }

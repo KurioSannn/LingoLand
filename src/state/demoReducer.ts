@@ -1,5 +1,6 @@
 import { createInitialState, DEMO_EMAIL, DEMO_PASSWORD } from "../data/demoData";
 import { calculateLevel } from "../lib/game";
+import type { HydratePayload } from "../lib/supabaseSync";
 import type { AvatarConfig, DemoState, MissionProgress, MissionStatus } from "../types";
 
 export type DemoAction =
@@ -7,6 +8,7 @@ export type DemoAction =
   | { type: "LOGIN_WITH_CREDENTIALS"; email: string; password: string }
   | { type: "LOGOUT" }
   | { type: "RESET_PROGRESS" }
+  | ({ type: "HYDRATE_REMOTE" } & HydratePayload)
   | { type: "SET_ACTIVE_MISSION"; missionId: string }
   | { type: "SAVE_AVATAR"; avatar: AvatarConfig }
   | { type: "BUY_ITEM"; itemId: string; price: number; itemName: string }
@@ -93,6 +95,18 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
     }
     case "ADD_ACTIVITY":
       return { ...state, recentActivity: recent(action.message, state.recentActivity) };
+    case "HYDRATE_REMOTE":
+      return {
+        ...state,
+        isAuthenticated: true,
+        user: { ...state.user, ...action.user, id: action.userId },
+        avatar: action.avatar ?? state.avatar,
+        inventory: action.inventory ?? state.inventory,
+        missionProgress: action.missionProgress ?? state.missionProgress,
+        completedMissionIds: action.completedMissionIds ?? state.completedMissionIds,
+        claimedRewards: action.claimedRewards ?? state.claimedRewards,
+        recentActivity: recent("Login berhasil terhubung ke Supabase.", state.recentActivity),
+      };
     default:
       return state;
   }

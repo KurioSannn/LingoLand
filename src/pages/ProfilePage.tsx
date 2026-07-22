@@ -15,8 +15,8 @@ import { useDemoStorage } from "../hooks/useDemoStorage";
 
 export function ProfilePage() {
   const navigate = useNavigate();
-  const { logout } = useDemoAuth();
-  const { state, resetProgress } = useDemoStorage();
+  const { logout, resetProgress } = useDemoAuth();
+  const { state } = useDemoStorage();
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
