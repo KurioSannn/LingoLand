@@ -14,6 +14,7 @@ export type DemoAction =
   | { type: "BUY_ITEM"; itemId: string; price: number; itemName: string }
   | { type: "UPDATE_MISSION_PROGRESS"; missionId: string; completedObjectiveIds: string[] }
   | { type: "CLAIM_REWARD"; missionId: string; xp: number; coins: number; missionTitle: string }
+  | { type: "COMPLETE_LESSON"; lessonUnitId: string; xp: number; lessonTitle: string }
   | { type: "ADD_ACTIVITY"; message: string };
 
 function recent(message: string, current: string[]): string[] {
@@ -91,6 +92,18 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
         claimedRewards: [...state.claimedRewards, action.missionId],
         missionProgress,
         recentActivity: recent(`Misi ${action.missionTitle} selesai.`, state.recentActivity),
+      };
+    }
+    case "COMPLETE_LESSON": {
+      // Same anti-exploit guard as CLAIM_REWARD: replaying a finished lesson is
+      // allowed as practice, but it must not grant XP a second time.
+      if (state.completedLessonIds.includes(action.lessonUnitId)) return state;
+      const xp = state.user.xp + action.xp;
+      return {
+        ...state,
+        user: { ...state.user, xp, level: calculateLevel(xp) },
+        completedLessonIds: [...state.completedLessonIds, action.lessonUnitId],
+        recentActivity: recent(`Lesson ${action.lessonTitle} selesai.`, state.recentActivity),
       };
     }
     case "ADD_ACTIVITY":

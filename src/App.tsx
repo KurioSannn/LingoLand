@@ -6,6 +6,8 @@ import { FriendsPage } from "./pages/FriendsPage";
 import { HomePage } from "./pages/HomePage";
 import { LandingPage } from "./pages/LandingPage";
 import { LearnPage } from "./pages/LearnPage";
+import { LessonPage } from "./pages/LessonPage";
+import { LessonsPage } from "./pages/LessonsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { StorePage } from "./pages/StorePage";
@@ -29,6 +31,8 @@ export function App() {
         <Route index element={<Navigate to="/app/home" replace />} />
         <Route path="home" element={<HomePage />} />
         <Route path="learn" element={<LearnPage />} />
+        <Route path="lessons" element={<LessonsPage />} />
+        <Route path="lessons/:unitId" element={<LessonPage />} />
         <Route path="avatar" element={<AvatarPage />} />
         <Route path="world" element={<WorldPage />} />
         <Route path="friends" element={<FriendsPage />} />

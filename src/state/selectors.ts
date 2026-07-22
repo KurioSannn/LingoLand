@@ -1,5 +1,5 @@
-import { avatarOptions, missions, storeItems } from "../data/demoData";
-import type { DemoState, Mission, MissionStatus, StoreItem } from "../types";
+import { avatarOptions, learningPath, lessonUnits, missions, storeItems } from "../data/demoData";
+import type { DemoState, LearningPathStatus, LessonUnit, Mission, MissionStatus, StoreItem } from "../types";
 
 export interface MissionSummary {
   mission: Mission;
@@ -33,6 +33,47 @@ export function selectMissionSummaries(state: DemoState): MissionSummary[] {
 
 export function selectActiveMissionSummary(state: DemoState): MissionSummary {
   return selectMissionSummaries(state).find((summary) => summary.mission.id === state.activeMissionId) ?? selectMissionSummaries(state)[0];
+}
+
+export interface LearningPathItemSummary {
+  id: string;
+  title: string;
+  status: LearningPathStatus;
+  lessonUnitId: string | null;
+}
+
+export interface LessonUnitSummary {
+  unit: LessonUnit;
+  status: "locked" | "unlocked" | "completed";
+}
+
+// A linear, self-contained exercise track: unit N unlocks once unit N-1 is
+// completed. Deliberately independent from mission/World progress — see
+// learningPath's comment in data/demoData.ts for why.
+export function selectLessonUnitSummaries(state: DemoState): LessonUnitSummary[] {
+  return lessonUnits.map((unit, index) => {
+    if (state.completedLessonIds.includes(unit.id)) return { unit, status: "completed" };
+    const previousUnit = lessonUnits[index - 1];
+    const isReachable = index === 0 || (previousUnit ? state.completedLessonIds.includes(previousUnit.id) : true);
+    return { unit, status: isReachable ? "unlocked" : "locked" };
+  });
+}
+
+export function selectLessonUnit(state: DemoState, unitId: string): LessonUnitSummary | null {
+  return selectLessonUnitSummaries(state).find((summary) => summary.unit.id === unitId) ?? null;
+}
+
+export function selectLearningPath(state: DemoState): LearningPathItemSummary[] {
+  const lessonSummaries = selectLessonUnitSummaries(state);
+
+  return learningPath.map((item) => {
+    if (item.comingSoon) return { id: item.id, title: item.title, status: "coming-soon", lessonUnitId: null };
+    if (!item.lessonUnitId) return { id: item.id, title: item.title, status: "completed", lessonUnitId: null };
+
+    const summary = lessonSummaries.find((entry) => entry.unit.id === item.lessonUnitId);
+    const status: LearningPathStatus = summary?.status ?? "locked";
+    return { id: item.id, title: item.title, status, lessonUnitId: item.lessonUnitId };
+  });
 }
 
 export function selectOwnedAvatarOptions(state: DemoState) {

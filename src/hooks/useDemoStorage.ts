@@ -1,6 +1,14 @@
 import { useMemo } from "react";
 import { useDemo } from "../state/DemoContext";
-import { selectActiveMissionSummary, selectMissionSummaries, selectOwnedAvatarOptions, selectStateSnapshot, selectStoreItemSummaries } from "../state/selectors";
+import {
+  selectActiveMissionSummary,
+  selectLearningPath,
+  selectLessonUnitSummaries,
+  selectMissionSummaries,
+  selectOwnedAvatarOptions,
+  selectStateSnapshot,
+  selectStoreItemSummaries,
+} from "../state/selectors";
 import type { AvatarConfig } from "../types";
 
 // Resetting progress touches Supabase (clear remote rows, re-seed the still-active
@@ -13,6 +21,8 @@ export function useDemoStorage() {
   const selectors = useMemo(() => ({
     activeMission: selectActiveMissionSummary(state),
     missionSummaries: selectMissionSummaries(state),
+    learningPath: selectLearningPath(state),
+    lessonUnitSummaries: selectLessonUnitSummaries(state),
     ownedAvatarOptions: selectOwnedAvatarOptions(state),
     storeItems: selectStoreItemSummaries(state),
     snapshot: selectStateSnapshot(state),
@@ -26,5 +36,7 @@ export function useDemoStorage() {
     saveAvatar: (avatar: AvatarConfig) => dispatch({ type: "SAVE_AVATAR", avatar }),
     buyItem: (itemId: string, price: number, itemName: string) => dispatch({ type: "BUY_ITEM", itemId, price, itemName }),
     addActivity: (message: string) => dispatch({ type: "ADD_ACTIVITY", message }),
+    completeLesson: (lessonUnitId: string, xp: number, lessonTitle: string) =>
+      dispatch({ type: "COMPLETE_LESSON", lessonUnitId, xp, lessonTitle }),
   };
 }

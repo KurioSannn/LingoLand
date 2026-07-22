@@ -1,12 +1,11 @@
-import { CheckCircle2, Clock, Coins, Hourglass, Lock, Play, Unlock, User } from "lucide-react";
+import { Clock, Coins, GraduationCap, User } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MissionCard } from "../components/missions/MissionCard";
-import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
-import { learningPath, missions } from "../data/demoData";
+import { missions } from "../data/demoData";
 import { useDemoStorage } from "../hooks/useDemoStorage";
 import type { MissionStatus } from "../types";
 
@@ -19,14 +18,6 @@ const filters: Array<{ id: MissionFilter; label: string }> = [
   { id: "locked", label: "Terkunci" },
 ];
 
-const pathMeta = {
-  completed: { icon: CheckCircle2, tone: "success" as const, label: "Selesai" },
-  active: { icon: Play, tone: "prototype" as const, label: "Aktif" },
-  unlocked: { icon: Unlock, tone: "info" as const, label: "Terbuka" },
-  locked: { icon: Lock, tone: "warning" as const, label: "Terkunci" },
-  "coming-soon": { icon: Hourglass, tone: "neutral" as const, label: "Segera Hadir" },
-};
-
 function matchesFilter(status: MissionStatus, filter: MissionFilter): boolean {
   if (filter === "all") return true;
   if (filter === "available") return status === "available" || status === "active" || status === "incomplete";
@@ -35,7 +26,7 @@ function matchesFilter(status: MissionStatus, filter: MissionFilter): boolean {
 
 export function LearnPage() {
   const navigate = useNavigate();
-  const { missionSummaries, setActiveMission } = useDemoStorage();
+  const { missionSummaries, learningPath, setActiveMission } = useDemoStorage();
   const [activeFilter, setActiveFilter] = useState<MissionFilter>("all");
   const [detailMissionId, setDetailMissionId] = useState<string | null>(null);
 
@@ -43,6 +34,10 @@ export function LearnPage() {
     () => missionSummaries.filter((summary) => matchesFilter(summary.status, activeFilter)),
     [missionSummaries, activeFilter],
   );
+
+  const chapters = learningPath.filter((item) => item.lessonUnitId !== null);
+  const completedChapters = chapters.filter((item) => item.status === "completed").length;
+  const chapterProgressPct = chapters.length > 0 ? Math.round((completedChapters / chapters.length) * 100) : 0;
 
   const detailMission = missions.find((mission) => mission.id === detailMissionId) ?? null;
 
@@ -55,9 +50,42 @@ export function LearnPage() {
   return (
     <section className="page-shell">
       <header>
-        <h1 className="text-3xl font-bold text-neutral-950">Pilih Misi Speaking</h1>
-        <p className="mt-2 text-neutral-500">Latihan singkat dengan objective yang jelas.</p>
+        <h1 className="text-3xl font-bold text-neutral-950">Belajar</h1>
+        <p className="mt-2 text-neutral-500">Kuasai kosakata di Learning Path, lalu praktikkan langsung lewat misi ngobrol bersama NPC.</p>
       </header>
+
+      <Card className="mt-6 flex flex-col gap-6 bg-primary-500 text-white sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-4">
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-white/15">
+            <GraduationCap size={28} aria-hidden />
+          </span>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-primary-100">Learning Path · 3 Bab</p>
+            <h2 className="mt-1 text-2xl font-bold">Latihan Soal Bahasa Inggris</h2>
+            <p className="mt-2 max-w-md text-sm text-primary-50">
+              Soal pilihan ganda dan susun kata ala kursus bahasa, bab demi bab — sebelum kamu praktik langsung lewat misi ngobrol bersama NPC.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-start gap-3 sm:items-end">
+          <div className="w-full sm:w-56">
+            <div className="flex items-center justify-between text-xs font-semibold text-primary-100">
+              <span>Progress</span>
+              <span>{completedChapters} dari {chapters.length} bab selesai</span>
+            </div>
+            <div className="mt-1.5 h-2 rounded-full bg-white/20">
+              <div className="h-full rounded-full bg-white transition-all" style={{ width: `${chapterProgressPct}%` }} />
+            </div>
+          </div>
+          <Button variant="secondary" className="w-full sm:w-auto" onClick={() => navigate("/app/lessons")}>
+            Buka Learning Path
+          </Button>
+        </div>
+      </Card>
+
+      <h2 className="mt-12 text-2xl font-bold text-neutral-950">Misi Speaking</h2>
+      <p className="mt-2 text-neutral-500">Latihan singkat dengan objective yang jelas.</p>
 
       <div className="mt-6 flex flex-wrap gap-2" role="group" aria-label="Filter misi">
         {filters.map((filter) => (
@@ -84,31 +112,6 @@ export function LearnPage() {
           <p className="text-neutral-500">Belum ada misi pada kategori ini.</p>
         </Card>
       )}
-
-      <div className="mt-12">
-        <h2 className="text-2xl font-bold text-neutral-950">Learning Path</h2>
-        <p className="mt-2 text-neutral-500">Jalur belajar dari dasar percakapan sampai presentasi profesional.</p>
-        <ol className="mt-6 grid gap-3">
-          {learningPath.map((item, index) => {
-            const meta = pathMeta[item.status];
-            const ItemIcon = meta.icon;
-            return (
-              <li key={item.id} className="flex items-center justify-between gap-3 rounded-md border border-neutral-200 bg-white px-4 py-3">
-                <span className="flex items-center gap-3">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-neutral-100 text-sm font-bold text-neutral-700">
-                    {index + 1}
-                  </span>
-                  <span className="text-sm font-semibold text-neutral-950">{item.title}</span>
-                </span>
-                <Badge tone={meta.tone}>
-                  <ItemIcon size={14} className="mr-1" aria-hidden />
-                  {meta.label}
-                </Badge>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
 
       <Modal isOpen={detailMission !== null} title={detailMission?.title ?? ""} onClose={() => setDetailMissionId(null)}>
         {detailMission ? (

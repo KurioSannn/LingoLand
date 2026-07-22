@@ -88,6 +88,7 @@ export function hydrateDemoState(value: unknown): DemoState | null {
     missionProgress: sanitizeMissionProgress(value.missionProgress, fallback.missionProgress),
     completedMissionIds: stringArray(value.completedMissionIds, fallback.completedMissionIds),
     claimedRewards: stringArray(value.claimedRewards, fallback.claimedRewards),
+    completedLessonIds: stringArray(value.completedLessonIds, fallback.completedLessonIds),
     recentActivity: stringArray(value.recentActivity, fallback.recentActivity).slice(0, 5),
   };
 }

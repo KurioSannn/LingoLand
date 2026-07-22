@@ -4,7 +4,7 @@ import type {
   DemoState,
   DemoUser,
   FriendPreview,
-  LearningPathStatus,
+  LessonUnit,
   Mission,
   NpcCharacter,
   StoreItem,
@@ -106,6 +106,128 @@ export const missions: Mission[] = [
   },
 ];
 
+// Lesson units are Duolingo-style exercise sets: multiple-choice and word-order
+// drills. They live outside the Mini Home/NPC world on purpose — practice here
+// prepares vocabulary for the matching mission's conversation, but completing a
+// lesson never marks the mission itself as done (that still requires actually
+// talking to the NPC). See relatedMissionId for the topic pairing only.
+export const lessonUnits: LessonUnit[] = [
+  {
+    id: "lesson-intro",
+    title: "Perkenalan Diri",
+    description: "Latihan kosakata perkenalan sebelum ngobrol langsung dengan Bintang di Mini Home.",
+    relatedMissionId: "intro",
+    rewardXp: 15,
+    exercises: [
+      {
+        id: "intro-mc-1",
+        type: "multiple-choice",
+        prompt: "Pilih cara paling tepat memperkenalkan nama.",
+        options: [
+          { id: "a", label: "My name is Raka." },
+          { id: "b", label: "Name my is Raka." },
+          { id: "c", label: "Raka name is." },
+        ],
+        correctOptionId: "a",
+      },
+      {
+        id: "intro-mc-2",
+        type: "multiple-choice",
+        prompt: "\"I am from Surabaya\" artinya...",
+        options: [
+          { id: "a", label: "Saya suka Surabaya" },
+          { id: "b", label: "Saya berasal dari Surabaya" },
+          { id: "c", label: "Saya pergi ke Surabaya" },
+        ],
+        correctOptionId: "b",
+      },
+      {
+        id: "intro-wo-1",
+        type: "word-order",
+        prompt: "Susun kata menjadi kalimat yang benar.",
+        wordBank: ["playing", "I", "games", "like"],
+        correctOrder: ["I", "like", "playing", "games"],
+      },
+    ],
+  },
+  {
+    id: "lesson-hobby",
+    title: "Hobi dan Minat",
+    description: "Latihan tanya-jawab soal hobi sebelum ngobrol dengan Lala.",
+    relatedMissionId: "hobby",
+    rewardXp: 15,
+    exercises: [
+      {
+        id: "hobby-mc-1",
+        type: "multiple-choice",
+        prompt: "Cara menanyakan hobi orang lain yang tepat...",
+        options: [
+          { id: "a", label: "What do you like to do?" },
+          { id: "b", label: "What you like do?" },
+          { id: "c", label: "Do you what like?" },
+        ],
+        correctOptionId: "a",
+      },
+      {
+        id: "hobby-wo-1",
+        type: "word-order",
+        prompt: "Susun kata menjadi kalimat yang benar.",
+        wordBank: ["is", "drawing", "hobby", "my"],
+        correctOrder: ["my", "hobby", "is", "drawing"],
+      },
+      {
+        id: "hobby-mc-2",
+        type: "multiple-choice",
+        prompt: "Pertanyaan lanjutan yang sopan setelah tahu hobi seseorang...",
+        options: [
+          { id: "a", label: "How often do you do it?" },
+          { id: "b", label: "How much it do you?" },
+          { id: "c", label: "You do it how often?" },
+        ],
+        correctOptionId: "a",
+      },
+    ],
+  },
+  {
+    id: "lesson-weekend",
+    title: "Percakapan Sehari-hari",
+    description: "Latihan bicara soal rencana akhir pekan sebelum ngobrol dengan Benny.",
+    relatedMissionId: "weekend",
+    rewardXp: 15,
+    exercises: [
+      {
+        id: "weekend-mc-1",
+        type: "multiple-choice",
+        prompt: "Cara menanyakan rencana akhir pekan yang tepat...",
+        options: [
+          { id: "a", label: "What will you do this weekend?" },
+          { id: "b", label: "What you will weekend do?" },
+          { id: "c", label: "Weekend what will do you?" },
+        ],
+        correctOptionId: "a",
+      },
+      {
+        id: "weekend-wo-1",
+        type: "word-order",
+        prompt: "Susun kata menjadi kalimat yang benar.",
+        wordBank: ["visit", "family", "will", "I", "my"],
+        correctOrder: ["I", "will", "visit", "my", "family"],
+      },
+      {
+        id: "weekend-mc-2",
+        type: "multiple-choice",
+        prompt: "Cara menutup percakapan dengan sopan...",
+        options: [
+          { id: "a", label: "That sounds great. See you later." },
+          { id: "b", label: "Ok bye now." },
+          { id: "c", label: "Sounds great you later see." },
+        ],
+        correctOptionId: "a",
+      },
+    ],
+  },
+];
+
 export const npcs: NpcCharacter[] = [
   { id: "bintang", name: "Bintang", personality: "Ramah dan membantu pemula.", position: [-3.2, 0, -1.4], missionId: "intro", zone: "Ruang tamu" },
   { id: "lala", name: "Lala", personality: "Aktif dan komunikatif.", position: [2.7, 0, -2.2], missionId: "hobby", zone: "Area belajar" },
@@ -129,13 +251,20 @@ export const friends: FriendPreview[] = [
   { id: "moker", name: "Moker", activity: "menyelesaikan daily challenge.", online: false, color: "#D99A24" },
 ];
 
-export const learningPath: Array<{ id: string; title: string; status: LearningPathStatus }> = [
-  { id: "basic", title: "Dasar Percakapan", status: "completed" },
-  { id: "intro-path", title: "Perkenalan Diri", status: "active" },
-  { id: "hobby-path", title: "Hobi dan Minat", status: "unlocked" },
-  { id: "daily", title: "Percakapan Sehari-hari", status: "locked" },
-  { id: "interview", title: "Interview Kerja", status: "coming-soon" },
-  { id: "presentation", title: "Presentasi Profesional", status: "coming-soon" },
+// `lessonUnitId: null` means the step has no exercises behind it yet (the
+// onboarding baseline) and is always shown as completed. `comingSoon: true`
+// steps are intentionally out of scope and always show "Segera Hadir", never a
+// fake progress status. Everything else derives its status live from
+// `completedLessonIds` via `selectLearningPath` — see state/selectors.ts.
+// This path is a separate, Duolingo-style exercise track — it does not gate or
+// get gated by mission/World progress; only the topic ties the two together.
+export const learningPath: Array<{ id: string; title: string; lessonUnitId: string | null; comingSoon?: boolean }> = [
+  { id: "basic", title: "Dasar Percakapan", lessonUnitId: null },
+  { id: "intro-path", title: "Perkenalan Diri", lessonUnitId: "lesson-intro" },
+  { id: "hobby-path", title: "Hobi dan Minat", lessonUnitId: "lesson-hobby" },
+  { id: "daily", title: "Percakapan Sehari-hari", lessonUnitId: "lesson-weekend" },
+  { id: "interview", title: "Interview Kerja", lessonUnitId: null, comingSoon: true },
+  { id: "presentation", title: "Presentasi Profesional", lessonUnitId: null, comingSoon: true },
 ];
 
 export function createInitialState(isAuthenticated = false): DemoState {
@@ -153,6 +282,7 @@ export function createInitialState(isAuthenticated = false): DemoState {
     },
     completedMissionIds: [],
     claimedRewards: [],
+    completedLessonIds: [],
     recentActivity: [
       "Misi Perkenalan Diri belum selesai.",
       "Kamu memiliki 15.000 koin demo.",

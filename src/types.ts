@@ -81,6 +81,34 @@ export interface MissionProgress {
   status: MissionStatus;
 }
 
+export type LessonExerciseType = "multiple-choice" | "word-order";
+
+export interface LessonChoiceOption {
+  id: string;
+  label: string;
+}
+
+export interface LessonExercise {
+  id: string;
+  type: LessonExerciseType;
+  prompt: string;
+  /** multiple-choice only */
+  options?: LessonChoiceOption[];
+  correctOptionId?: string;
+  /** word-order only */
+  wordBank?: string[];
+  correctOrder?: string[];
+}
+
+export interface LessonUnit {
+  id: string;
+  title: string;
+  description: string;
+  relatedMissionId: string;
+  rewardXp: number;
+  exercises: LessonExercise[];
+}
+
 export interface ConversationMessage {
   id: string;
   sender: "player" | "npc" | "system";
@@ -98,6 +126,7 @@ export interface DemoState {
   missionProgress: Record<string, MissionProgress>;
   completedMissionIds: string[];
   claimedRewards: string[];
+  completedLessonIds: string[];
   recentActivity: string[];
 }
 
