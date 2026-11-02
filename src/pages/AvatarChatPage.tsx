@@ -1,4 +1,4 @@
-import { ArrowLeft, Send, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Mic, Send, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AvatarPreview } from "../components/three/AvatarPreview";
@@ -7,6 +7,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { useAvatarVoice } from "../hooks/useAvatarVoice";
 import { useDemoStorage } from "../hooks/useDemoStorage";
+import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 import { sendAvatarChatMessage } from "../lib/avatarChatClient";
 import type { AvatarChatMessage } from "../lib/avatarChatClient";
 
@@ -29,6 +30,7 @@ export function AvatarChatPage() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const voice = useAvatarVoice();
+  const { micStatus, startSpeechRecognition } = useSpeechRecognition(setInput);
 
   async function handleSend() {
     const trimmed = input.trim();
@@ -129,11 +131,17 @@ export function AvatarChatPage() {
                 }
               }}
             />
+            <Button variant="secondary" type="button" onClick={startSpeechRecognition} disabled={isSending}>
+              <Mic size={18} aria-hidden />
+              {micStatus === "listening" ? "Mendengarkan..." : "Mic"}
+            </Button>
             <Button onClick={handleSend} disabled={input.trim().length < 2 || isSending} isLoading={isSending}>
               <Send size={18} aria-hidden />
               Kirim
             </Button>
           </div>
+          {micStatus === "unsupported" ? <p className="form-help error">Speech recognition belum didukung browser ini. Gunakan input teks.</p> : null}
+          {micStatus === "denied" ? <p className="form-help error">Izin mikrofon ditolak. Kamu tetap dapat menjawab lewat teks.</p> : null}
           <p className="text-xs text-neutral-500">
             <Sparkles size={12} className="mr-1 inline text-primary-500" aria-hidden />
             Ini bukan latihan misi berhak reward — untuk XP dan koin, selesaikan misi di Belajar atau Learning Path.

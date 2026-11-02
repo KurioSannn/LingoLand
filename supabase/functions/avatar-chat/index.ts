@@ -6,17 +6,19 @@
 // JS bundle, where anyone can read it and burn your quota. This function
 // keeps the key server-side as a Supabase secret instead.
 //
-// NOT DEPLOYED YET. To activate:
-//   1. supabase secrets set GEMINI_API_KEY=your-key-here
-//   2. supabase functions deploy avatar-chat
-// Until both are done, src/lib/avatarChatClient.ts falls back to an honest
-// "belum aktif" message instead of pretending this is live (see PRD:
-// "jangan mengklaim bahwa ... AI sudah tersedia").
+// To (re)activate after changing this file:
+//   supabase secrets set GEMINI_API_KEY=your-key-here   (only needed once)
+//   supabase functions deploy avatar-chat                (needed on every code change)
+// If GEMINI_API_KEY isn't set yet, src/lib/avatarChatClient.ts falls back to
+// an honest "belum aktif" message instead of pretending this is live (see
+// PRD: "jangan mengklaim bahwa ... AI sudah tersedia").
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 const SYSTEM_PROMPT = `You are a friendly English-speaking practice companion inside Lingoland,
 an app that helps nervous beginners practice speaking English without fear of judgment.
@@ -52,20 +54,30 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: messages.map((message) => ({
-            role: message.role,
-            parts: [{ text: message.content }],
-          })),
-        }),
-      },
-    );
+    const requestBody = JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: messages.map((message) => ({
+        role: message.role,
+        parts: [{ text: message.content }],
+      })),
+    });
+
+    async function callGemini() {
+      return fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: requestBody },
+      );
+    }
+
+    let geminiResponse = await callGemini();
+
+    // Gemini's free-tier flash models occasionally return 503 "high demand" —
+    // that's Google's capacity, not our request. One retry after a short
+    // pause clears most of these without the user having to resend manually.
+    if (geminiResponse.status === 503) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      geminiResponse = await callGemini();
+    }
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();

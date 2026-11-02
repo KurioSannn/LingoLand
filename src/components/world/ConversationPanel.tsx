@@ -1,20 +1,13 @@
 import { Coins, Mic, Send, Sparkles, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { missions } from "../../data/demoData";
+import { useSpeechRecognition } from "../../hooks/useSpeechRecognition";
 import { evaluateMissionInput, npcReply } from "../../lib/game";
 import { useDemo } from "../../state/DemoContext";
 import type { ConversationMessage, NpcCharacter } from "../../types";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
-
-interface SpeechRecognitionLike {
-  lang: string;
-  interimResults: boolean;
-  start: () => void;
-  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
-  onerror: (() => void) | null;
-}
 
 export function ConversationPanel({ npc, onClose }: { npc: NpcCharacter; onClose: () => void }) {
   const { state, dispatch } = useDemo();
@@ -30,7 +23,7 @@ export function ConversationPanel({ npc, onClose }: { npc: NpcCharacter; onClose
     },
   ]);
   const [input, setInput] = useState("");
-  const [micStatus, setMicStatus] = useState<"idle" | "listening" | "unsupported" | "denied">("idle");
+  const { micStatus, startSpeechRecognition } = useSpeechRecognition(setInput);
   const [completion, setCompletion] = useState<string | null>(null);
   const [rewardModalOpen, setRewardModalOpen] = useState(false);
   const [lastReward, setLastReward] = useState<{ xp: number; coins: number; repeat: boolean } | null>(null);
@@ -63,29 +56,6 @@ export function ConversationPanel({ npc, onClose }: { npc: NpcCharacter; onClose
       setLastReward({ xp: hasClaimedReward ? 0 : mission.rewardXp, coins: hasClaimedReward ? 0 : mission.rewardCoins, repeat: hasClaimedReward });
       setCompletion(hasClaimedReward ? "Latihan ulang selesai. Reward penuh sudah pernah diklaim." : `Misi selesai. +${mission.rewardXp} XP dan +${mission.rewardCoins} koin.`);
       setRewardModalOpen(true);
-    }
-  }
-
-  function startSpeechRecognition() {
-    const SpeechApi = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-    if (!SpeechApi) {
-      setMicStatus("unsupported");
-      return;
-    }
-
-    try {
-      const recognition = new SpeechApi() as SpeechRecognitionLike;
-      recognition.lang = "en-US";
-      recognition.interimResults = false;
-      recognition.onresult = (event) => {
-        setInput(event.results[0][0].transcript);
-        setMicStatus("idle");
-      };
-      recognition.onerror = () => setMicStatus("denied");
-      setMicStatus("listening");
-      recognition.start();
-    } catch {
-      setMicStatus("denied");
     }
   }
 
