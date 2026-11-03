@@ -2064,7 +2064,7 @@ begin
           into v_user_ans
           from jsonb_array_elements_text(v_raw_ans) as elem;
         else
-          v_user_ans := btrim(both '"' from (p_answers ->> v_q.id));
+          v_user_ans := trim(both '"' from (p_answers ->> v_q.id));
         end if;
       end if;
     end if;
