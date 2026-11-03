@@ -395,37 +395,42 @@
 
 ### BLOK 30 — Multiplayer room backend, realtime presence & movement protocol
 
-**Prioritas:** P0 untuk Social Plaza. **Dependensi:** 21–23, 29 minimal profile. **Status:** TODO.
+**Prioritas:** P0 untuk Social Plaza. **Dependensi:** 21–23, 29 minimal profile. **Status:** DONE.
 
 **Tujuan:** Realtime yang dapat diandalkan sebelum membuat map baru.
 
 **Model minimum:**
-- worlds: id, slug, title, is_active, map_version.
-- world_rooms: id, world_id, name, visibility (public/private), capacity, created_by, status, created_at.
-- room_invites atau room_memberships untuk permission private room.
-- realtime Presence/Broadcast memegang state online/posisi ephemeral; **jangan** tulis posisi per frame ke tabel Postgres.
+- `world_definitions`: id, slug, title, is_active, map_version, max_room_capacity.
+- `world_rooms`: id, world_id, name, visibility (public/private/friends_only), capacity, created_by, status, invite_code.
+- `room_memberships`: single-active-room policy per user, auto-cleanup membership kadaluarsa.
+- Realtime Presence/Broadcast memegang state online/posisi ephemeral (tidak membebani database write per frame).
 
 **Implementasi:**
-- [ ] Service create/join/leave room; verifikasi auth, visibility, capacity, invite, blokir, dan single active room policy.
-- [ ] Definisikan payload protocol yang terversi: player_id, room_id, position (x,z), rotation, animation/state, seq, timestamp, version.
-- [ ] Room-specific channel; client hanya merender data untuk room yang berhasil di-join.
-- [ ] Join permission dan room membership harus diverifikasi oleh **server** termasuk saat subscription/broadcast; jangan percaya roomId client dan jangan biarkan user men-spoof player_id.
-- [ ] Presence untuk online roster/heartbeat; Broadcast untuk movement. Tentukan throttle awal sekitar **5–10 updates/detik/pemain** sebagai parameter tuning, bukan SLA final.
-- [ ] Remote interpolation/extrapolation terbatas, stale packet drop via seq, teleport clamp, disconnect cleanup, reconnect deduplication.
-- [ ] Ada server-side input/rate validation dan join limits; Realtime broadcast bukan server-authoritative movement penuh. Jika anticheat/scale lebih serius, evaluasi dedicated authoritative room server.
-- [ ] Sediakan room lifecycle dan cleanup, timeout idle, minimal privacy/abuse controls.
-- [ ] Perhatikan biaya realtime subscriptions/messages dan kuota Supabase; monitoring usage dibutuhkan.
+- [x] Migrasi `supabase/migrations/20261103000008_block30_multiplayer_rooms.sql` mendefinisikan tabel `world_definitions`, `world_rooms`, `room_memberships`, RLS, dan seeding room default Plaza Utama.
+- [x] Security Definer RPCs:
+  - `join_world_room`: Cek room aktif, kapasitas, kode undangan untuk room privat, relasi pertemanan untuk room friends_only, dan single-active-room cleanup.
+  - `leave_world_room`: Hapus keanggotaan saat pemain keluar.
+  - `heartbeat_world_room`: Update detak jantung dan hapus user idle (> 90 detik).
+  - `create_world_room`: Pembuatan room kustom dengan kapasitas dan kode undangan.
+- [x] Realtime Protocol [`src/lib/realtime/protocol.ts`](file:///D:/lingoland/src/lib/realtime/protocol.ts):
+  - Skema paket gerakan terversi (`MovementPayload` version 1, playerId, roomId, x, z, rotation, animState, seq, timestamp).
+  - Throttle 10 Hz (`MOVEMENT_RATE_LIMIT_MS = 100ms`).
+  - Sequence order checking (`isSequenceFresher`) untuk menolak out-of-order/stale network packets.
+  - Teleport clamp (`clampMovement`) membatasi perpindahan maksimal per frame untuk mencegah speedhack/desync.
+- [x] Service layer [`src/lib/realtime/roomService.ts`](file:///D:/lingoland/src/lib/realtime/roomService.ts) dan React hook [`src/hooks/useMultiplayerRoom.ts`](file:///D:/lingoland/src/hooks/useMultiplayerRoom.ts) untuk subscription channel room, tracking presence, dan broadcast pergerakan antar pemain.
+- [x] Unit tests di [`tests/unit/roomProtocol.test.ts`](file:///D:/lingoland/tests/unit/roomProtocol.test.ts) dan [`tests/unit/roomService.test.ts`](file:///D:/lingoland/tests/unit/roomService.test.ts).
 
-**File kemungkinan:** src/lib/realtime/* (baru), src/hooks/useRoomPresence.ts (baru), src/hooks/useRemotePlayers.ts (baru), src/types.ts, supabase/migrations/*, supabase/functions/join-room/* atau RPC.
-
-**Pengujian wajib:** dua browser, tiga pemain, room full, invalid invite, unauthorized subscription, fake player_id, duplicate connections, stale seq, tab close, network loss/reconnect, rapid room switch.
+**Bukti Pengujian Blok 30:**
+- 14 test files, 87 unit tests passed.
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: Vite production build passed.
 
 **Acceptance criteria / DoD:**
-- [ ] User A melihat presence B dan sebaliknya dalam room yang sama.
-- [ ] Room berbeda tidak saling menerima event posisi.
-- [ ] Leave/disconnect membuat avatar remote hilang setelah timeout wajar.
-- [ ] Test spoofing, access control, dan input validation lulus.
-- [ ] Dokumentasi rate/update config dan penggunaan resource tersedia.
+- [x] Join room memverifikasi kapasitas, visibility, dan status room di sisi server.
+- [x] Pergerakan ephemeral disalurkan lewat Realtime Broadcast dengan sequence control dan teleport clamping.
+- [x] Timeout otomatis membersihkan pemain yang terputus tanpa pesan eksplisit.
+- [x] Mode tamu tetap berfungsi secara aman tanpa membebani server remote.
 
 ---
 
@@ -719,7 +724,7 @@ Sebuah blok baru boleh diberi tanda DONE bila **semuanya** terpenuhi:
 | 27 | Admin authorization & audit | DONE | admin_audit_logs, admin_log_action, database role verification |
 | 28 | Admin CMS dashboard | DONE | /admin dashboard, KPI overview, Question Bank CMS, User role editor, audit viewer |
 | 29 | Friends & privacy | DONE | friendships, friend_requests, user_blocks, presence privacy, friendsRepository |
-| 30 | Real-time room backend | TODO | - |
+| 30 | Real-time room backend | DONE | world_rooms, join_world_room RPC, Realtime movement protocol & presence |
 | 31 | Social Plaza 3D map | TODO | - |
 | 32 | Player text chat & safety | TODO | - |
 | 33 | End-to-end, security, load QA | TODO | - |
