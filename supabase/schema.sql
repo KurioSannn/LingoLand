@@ -1,6 +1,7 @@
 ﻿-- ============================================================================
--- LINGOLAND FULL PRODUCTION DATABASE SCHEMA (BLOK 1 - BLOK 34)
--- Copy seluruh isi file ini ke Supabase Dashboard -> SQL Editor -> Klik RUN
+-- LINGOLAND PRODUCTION SCHEMA BUNDLE (All Migrations + Security Hardening)
+-- Cara pakai: Copy seluruh isi file ini ke Supabase SQL Editor -> klik Run
+-- Aman dijalankan berulang kali (Idempotent / IF NOT EXISTS / OR REPLACE)
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -61,25 +62,21 @@ alter table public.inventory_items enable row level security;
 alter table public.mission_progress enable row level security;
 alter table public.claimed_rewards enable row level security;
 
-drop policy if exists "profiles_owner" on public.profiles;
 create policy "profiles_owner" on public.profiles
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-drop policy if exists "avatar_configs_owner" on public.avatar_configs;
 create policy "avatar_configs_owner" on public.avatar_configs
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-drop policy if exists "inventory_items_owner" on public.inventory_items;
 create policy "inventory_items_owner" on public.inventory_items
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-drop policy if exists "mission_progress_owner" on public.mission_progress;
 create policy "mission_progress_owner" on public.mission_progress
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-drop policy if exists "claimed_rewards_owner" on public.claimed_rewards;
 create policy "claimed_rewards_owner" on public.claimed_rewards
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 
 -- ----------------------------------------------------------------------------
 -- SOURCE: 20261103000001_block22_rbac_profiles_rls.sql
@@ -143,12 +140,10 @@ drop policy if exists "user_roles_read_own_or_admin" on public.user_roles;
 drop policy if exists "user_roles_service_role_all" on public.user_roles;
 
 -- Users can read their own assigned roles; Admins can view all user roles
-drop policy if exists "user_roles_read_own_or_admin" on public.user_roles;
 create policy "user_roles_read_own_or_admin" on public.user_roles
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
 
 -- Only service_role can directly insert/update/delete user_roles
-drop policy if exists "user_roles_service_role_all" on public.user_roles;
 create policy "user_roles_service_role_all" on public.user_roles
   for all using (auth.jwt() ->> 'role' = 'service_role');
 
@@ -193,17 +188,14 @@ drop policy if exists "profiles_insert_own" on public.profiles;
 drop policy if exists "profiles_update_own" on public.profiles;
 
 -- Read policy: Owner can read full profile, others can read public profiles (is_private = false), admin can read all
-drop policy if exists "profiles_select_own_or_public" on public.profiles;
 create policy "profiles_select_own_or_public" on public.profiles
   for select using (auth.uid() = user_id or is_private = false or public.is_admin(auth.uid()));
 
 -- Insert policy: Authenticated users can insert their own profile
-drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
   for insert with check (auth.uid() = user_id);
 
 -- Update policy: Users can update their own profile, Admins can update any profile
-drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own" on public.profiles
   for update using (auth.uid() = user_id or public.is_admin(auth.uid()))
   with check (auth.uid() = user_id or public.is_admin(auth.uid()));
@@ -223,6 +215,7 @@ drop trigger if exists on_auth_user_created_assign_role on auth.users;
 create trigger on_auth_user_created_assign_role
   after insert on auth.users
   for each row execute function public.handle_new_auth_user();
+
 
 -- ----------------------------------------------------------------------------
 -- SOURCE: 20261103000002_block23_lesson_progress.sql
@@ -250,22 +243,19 @@ drop policy if exists "lesson_progress_owner" on public.lesson_progress;
 drop policy if exists "lesson_progress_select_own_or_admin" on public.lesson_progress;
 
 -- Users can read their own lesson progress; Admins can read all for analytics
-drop policy if exists "lesson_progress_select_own_or_admin" on public.lesson_progress;
 create policy "lesson_progress_select_own_or_admin" on public.lesson_progress
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
 
 -- Users can insert/update their own lesson progress
-drop policy if exists "lesson_progress_insert_own" on public.lesson_progress;
 create policy "lesson_progress_insert_own" on public.lesson_progress
   for insert with check (auth.uid() = user_id);
 
-drop policy if exists "lesson_progress_update_own" on public.lesson_progress;
 create policy "lesson_progress_update_own" on public.lesson_progress
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-drop policy if exists "lesson_progress_delete_own" on public.lesson_progress;
 create policy "lesson_progress_delete_own" on public.lesson_progress
   for delete using (auth.uid() = user_id or public.is_admin(auth.uid()));
+
 
 -- ----------------------------------------------------------------------------
 -- SOURCE: 20261103000003_block24_economy_ledger_rpc.sql
@@ -307,11 +297,9 @@ alter table public.wallet_transactions enable row level security;
 drop policy if exists "wallet_transactions_select_own_or_admin" on public.wallet_transactions;
 drop policy if exists "wallet_transactions_service_role_all" on public.wallet_transactions;
 
-drop policy if exists "wallet_transactions_select_own_or_admin" on public.wallet_transactions;
 create policy "wallet_transactions_select_own_or_admin" on public.wallet_transactions
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
 
-drop policy if exists "wallet_transactions_service_role_all" on public.wallet_transactions;
 create policy "wallet_transactions_service_role_all" on public.wallet_transactions
   for all using (auth.jwt() ->> 'role' = 'service_role');
 
@@ -326,7 +314,6 @@ create table if not exists public.mission_definitions (
 );
 
 alter table public.mission_definitions enable row level security;
-drop policy if exists "mission_definitions_read_all" on public.mission_definitions;
 create policy "mission_definitions_read_all" on public.mission_definitions
   for select using (is_active = true or public.is_admin(auth.uid()));
 
@@ -351,7 +338,6 @@ create table if not exists public.store_item_definitions (
 );
 
 alter table public.store_item_definitions enable row level security;
-drop policy if exists "store_item_definitions_read_all" on public.store_item_definitions;
 create policy "store_item_definitions_read_all" on public.store_item_definitions
   for select using (is_active = true or public.is_admin(auth.uid()));
 
@@ -603,6 +589,7 @@ create trigger on_protect_profile_economy
   before update on public.profiles
   for each row execute function public.protect_profile_economy_fields();
 
+
 -- ----------------------------------------------------------------------------
 -- SOURCE: 20261103000004_block25_curriculum_question_bank.sql
 -- ----------------------------------------------------------------------------
@@ -737,39 +724,30 @@ alter table public.curriculum_question_answer_keys enable row level security;
 alter table public.lesson_attempts enable row level security;
 
 -- Courses: Public/Learners can view published, Admins can view all and mutate
-drop policy if exists "courses_select_published_or_admin" on public.courses;
 create policy "courses_select_published_or_admin" on public.courses
   for select using (status = 'published' or public.is_admin(auth.uid()));
-drop policy if exists "courses_admin_all" on public.courses;
 create policy "courses_admin_all" on public.courses
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Units: Public/Learners can view published, Admins can view all and mutate
-drop policy if exists "units_select_published_or_admin" on public.curriculum_units;
 create policy "units_select_published_or_admin" on public.curriculum_units
   for select using (status = 'published' or public.is_admin(auth.uid()));
-drop policy if exists "units_admin_all" on public.curriculum_units;
 create policy "units_admin_all" on public.curriculum_units
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Lessons: Public/Learners can view published, Admins can view all and mutate
-drop policy if exists "lessons_select_published_or_admin" on public.curriculum_lessons;
 create policy "lessons_select_published_or_admin" on public.curriculum_lessons
   for select using (status = 'published' or public.is_admin(auth.uid()));
-drop policy if exists "lessons_admin_all" on public.curriculum_lessons;
 create policy "lessons_admin_all" on public.curriculum_lessons
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Questions: Public/Learners can view published, Admins can view all and mutate
-drop policy if exists "questions_select_published_or_admin" on public.curriculum_questions;
 create policy "questions_select_published_or_admin" on public.curriculum_questions
   for select using (status = 'published' or public.is_admin(auth.uid()));
-drop policy if exists "questions_admin_all" on public.curriculum_questions;
 create policy "questions_admin_all" on public.curriculum_questions
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Question Options: Public/Learners can view options of published questions
-drop policy if exists "question_options_select_published" on public.curriculum_question_options;
 create policy "question_options_select_published" on public.curriculum_question_options
   for select using (
     exists (
@@ -778,20 +756,16 @@ create policy "question_options_select_published" on public.curriculum_question_
       and (q.status = 'published' or public.is_admin(auth.uid()))
     )
   );
-drop policy if exists "question_options_admin_all" on public.curriculum_question_options;
 create policy "question_options_admin_all" on public.curriculum_question_options
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Question Answer Keys: STRICT SERVER-ONLY / ADMIN-ONLY (Learners NEVER have SELECT access!)
-drop policy if exists "answer_keys_admin_and_service_only" on public.curriculum_question_answer_keys;
 create policy "answer_keys_admin_and_service_only" on public.curriculum_question_answer_keys
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Lesson Attempts: Learners can read and insert their own attempts
-drop policy if exists "lesson_attempts_owner_select" on public.lesson_attempts;
 create policy "lesson_attempts_owner_select" on public.lesson_attempts
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
-drop policy if exists "lesson_attempts_owner_insert" on public.lesson_attempts;
 create policy "lesson_attempts_owner_insert" on public.lesson_attempts
   for insert with check (auth.uid() = user_id);
 
@@ -895,6 +869,7 @@ values
   ('weekend-mc-2', 'exact', 'a')
 on conflict (question_id) do update set
   expected_answer = excluded.expected_answer;
+
 
 -- ----------------------------------------------------------------------------
 -- SOURCE: 20261103000005_block26_server_grading_engine.sql
@@ -1050,6 +1025,7 @@ begin
 end;
 $$;
 
+
 -- ----------------------------------------------------------------------------
 -- SOURCE: 20261103000006_block27_admin_audit_cms.sql
 -- ----------------------------------------------------------------------------
@@ -1076,11 +1052,9 @@ alter table public.admin_audit_logs enable row level security;
 drop policy if exists "admin_audit_logs_select_admin" on public.admin_audit_logs;
 drop policy if exists "admin_audit_logs_insert_admin" on public.admin_audit_logs;
 
-drop policy if exists "admin_audit_logs_select_admin" on public.admin_audit_logs;
 create policy "admin_audit_logs_select_admin" on public.admin_audit_logs
   for select using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
-drop policy if exists "admin_audit_logs_insert_admin" on public.admin_audit_logs;
 create policy "admin_audit_logs_insert_admin" on public.admin_audit_logs
   for insert with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
@@ -1233,6 +1207,7 @@ begin
 end;
 $$;
 
+
 -- ----------------------------------------------------------------------------
 -- SOURCE: 20261103000007_block29_friends_social_privacy.sql
 -- ----------------------------------------------------------------------------
@@ -1301,18 +1276,15 @@ alter table public.user_blocks enable row level security;
 
 -- Friendships RLS
 drop policy if exists "friendships_select_members_or_admin" on public.friendships;
-drop policy if exists "friendships_select_members_or_admin" on public.friendships;
 create policy "friendships_select_members_or_admin" on public.friendships
   for select using (auth.uid() = user_a or auth.uid() = user_b or public.is_admin(auth.uid()));
 
 -- Friend Requests RLS
 drop policy if exists "friend_requests_select_parties_or_admin" on public.friend_requests;
-drop policy if exists "friend_requests_select_parties_or_admin" on public.friend_requests;
 create policy "friend_requests_select_parties_or_admin" on public.friend_requests
   for select using (auth.uid() = sender_id or auth.uid() = receiver_id or public.is_admin(auth.uid()));
 
 -- User Blocks RLS
-drop policy if exists "user_blocks_select_blocker_or_admin" on public.user_blocks;
 drop policy if exists "user_blocks_select_blocker_or_admin" on public.user_blocks;
 create policy "user_blocks_select_blocker_or_admin" on public.user_blocks
   for select using (auth.uid() = blocker_id or public.is_admin(auth.uid()));
@@ -1561,6 +1533,7 @@ begin
 end;
 $$;
 
+
 -- ----------------------------------------------------------------------------
 -- SOURCE: 20261103000008_block30_multiplayer_rooms.sql
 -- ----------------------------------------------------------------------------
@@ -1631,12 +1604,10 @@ alter table public.world_rooms enable row level security;
 alter table public.room_memberships enable row level security;
 
 -- World definitions are publicly readable
-drop policy if exists "world_definitions_select_all" on public.world_definitions;
 create policy "world_definitions_select_all" on public.world_definitions
   for select using (true);
 
 -- World rooms: Public rooms visible to all authenticated users, private visible to creator/admin
-drop policy if exists "world_rooms_select_accessible" on public.world_rooms;
 create policy "world_rooms_select_accessible" on public.world_rooms
   for select using (
     visibility = 'public'
@@ -1646,7 +1617,6 @@ create policy "world_rooms_select_accessible" on public.world_rooms
   );
 
 -- Room memberships: visible to members in the same room or admin
-drop policy if exists "room_memberships_select_room" on public.room_memberships;
 create policy "room_memberships_select_room" on public.room_memberships
   for select using (
     auth.uid() = user_id
@@ -1807,6 +1777,7 @@ begin
 end;
 $$;
 
+
 -- ----------------------------------------------------------------------------
 -- SOURCE: 20261103000009_block32_player_chat_moderation_practice.sql
 -- ----------------------------------------------------------------------------
@@ -1849,32 +1820,26 @@ alter table public.user_mutes enable row level security;
 
 -- Moderation Reports RLS
 drop policy if exists "moderation_reports_insert_auth" on public.moderation_reports;
-drop policy if exists "moderation_reports_insert_auth" on public.moderation_reports;
 create policy "moderation_reports_insert_auth" on public.moderation_reports
   for insert with check (auth.uid() = reporter_id);
 
 drop policy if exists "moderation_reports_select_reporter_or_admin" on public.moderation_reports;
-drop policy if exists "moderation_reports_select_reporter_or_admin" on public.moderation_reports;
 create policy "moderation_reports_select_reporter_or_admin" on public.moderation_reports
   for select using (auth.uid() = reporter_id or public.is_admin(auth.uid()));
 
-drop policy if exists "moderation_reports_update_admin" on public.moderation_reports;
 drop policy if exists "moderation_reports_update_admin" on public.moderation_reports;
 create policy "moderation_reports_update_admin" on public.moderation_reports
   for update using (public.is_admin(auth.uid()));
 
 -- User Mutes RLS
 drop policy if exists "user_mutes_select_own" on public.user_mutes;
-drop policy if exists "user_mutes_select_own" on public.user_mutes;
 create policy "user_mutes_select_own" on public.user_mutes
   for select using (auth.uid() = muter_id);
 
 drop policy if exists "user_mutes_insert_own" on public.user_mutes;
-drop policy if exists "user_mutes_insert_own" on public.user_mutes;
 create policy "user_mutes_insert_own" on public.user_mutes
   for insert with check (auth.uid() = muter_id);
 
-drop policy if exists "user_mutes_delete_own" on public.user_mutes;
 drop policy if exists "user_mutes_delete_own" on public.user_mutes;
 create policy "user_mutes_delete_own" on public.user_mutes
   for delete using (auth.uid() = muter_id);
@@ -1955,13 +1920,925 @@ returns table (muted_id uuid) language sql security definer set search_path = pu
   select muted_id from public.user_mutes where muter_id = auth.uid();
 $$;
 
--- ----------------------------------------------------------------------------
--- AUTO-BOOTSTRAP ROLE ADMIN UNTUK AKUN YANG SUDAH TERDAFTAR DI AUTH.USERS
--- ----------------------------------------------------------------------------
-insert into public.user_roles (user_id, role)
-select id, 'user'::public.app_role from auth.users
-on conflict (user_id, role) do nothing;
 
-insert into public.user_roles (user_id, role)
-select id, 'admin'::public.app_role from auth.users
-on conflict (user_id, role) do nothing;
+-- ----------------------------------------------------------------------------
+-- SOURCE: 20261103000010_fix_lesson_reward_security.sql
+-- ----------------------------------------------------------------------------
+-- ==============================================================================
+-- Migration: 20261103000010_fix_lesson_reward_security.sql
+-- Description: Phase 1 & Phase 4.4 Critical Security Fix â€” Remove legacy client-score
+--              lesson completion bypass (complete_lesson_atomic) and harden
+--              server-authoritative grading (grade_lesson_attempt_atomic).
+-- ==============================================================================
+
+-- 1. Revoke execution permissions and drop legacy insecure completion RPC
+do $$ begin
+  revoke all on function public.complete_lesson_atomic(text, integer) from public, anon, authenticated;
+exception
+  when undefined_function then null;
+end $$;
+
+drop function if exists public.complete_lesson_atomic(text, integer);
+
+-- 2. Upgrade grade_lesson_attempt_atomic to be the single authoritative grading & reward path
+create or replace function public.grade_lesson_attempt_atomic(
+  p_lesson_unit_id text,
+  p_answers jsonb
+)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_lesson record;
+  v_unit_id text;
+  v_total_questions integer := 0;
+  v_correct_count integer := 0;
+  v_score integer := 0;
+  v_pass_threshold integer := 70;
+  v_passed boolean := false;
+  v_q record;
+  v_raw_ans jsonb;
+  v_user_ans text;
+  v_expected_ans text;
+  v_is_correct boolean;
+  v_results jsonb := '[]'::jsonb;
+  v_already_completed boolean := false;
+  v_idempotency_key text;
+  v_reward_xp integer := 15;
+  v_gained_xp integer := 0;
+  v_current_xp integer := 0;
+  v_current_level integer := 1;
+begin
+  if v_user_id is null then
+    raise exception 'Akses ditolak: Pengguna harus login.';
+  end if;
+
+  if p_lesson_unit_id is null or btrim(p_lesson_unit_id) = '' then
+    raise exception 'ID lesson tidak valid.';
+  end if;
+
+  if p_answers is null or jsonb_typeof(p_answers) != 'object' then
+    raise exception 'Format jawaban tidak valid: harus berupa objek JSON.';
+  end if;
+
+  -- 1. Cari lesson yang dipublikasikan berdasarkan lesson.id atau lesson.unit_id
+  --    Pastikan unit induk juga berstatus published.
+  select l.*
+  into v_lesson
+  from public.curriculum_lessons l
+  join public.curriculum_units u on u.id = l.unit_id
+  where (l.id = p_lesson_unit_id or l.unit_id = p_lesson_unit_id)
+    and l.status = 'published'
+    and u.status = 'published'
+  order by case when l.id = p_lesson_unit_id then 0 else 1 end, l.order_index asc
+  limit 1;
+
+  if not found then
+    raise exception 'Lesson tidak ditemukan atau belum dipublikasikan: %', p_lesson_unit_id;
+  end if;
+
+  v_unit_id := coalesce(v_lesson.unit_id, v_lesson.id);
+  v_pass_threshold := coalesce(v_lesson.pass_threshold, 70);
+  v_reward_xp := coalesce(v_lesson.reward_xp, 15);
+
+  -- 2. Lock baris profil pengguna untuk mencegah race condition reward ganda
+  select xp, level
+  into v_current_xp, v_current_level
+  from public.profiles
+  where user_id = v_user_id
+  for update;
+
+  -- 3. Evaluasi seluruh soal published yang memiliki kunci jawaban
+  for v_q in (
+    select q.id, q.question_type, q.explanation, ak.validation_type, ak.expected_answer
+    from public.curriculum_questions q
+    join public.curriculum_question_answer_keys ak on ak.question_id = q.id
+    where q.lesson_id = v_lesson.id
+      and q.status = 'published'
+    order by q.order_index asc, q.id asc
+  ) loop
+    v_total_questions := v_total_questions + 1;
+    v_is_correct := false;
+    v_user_ans := null;
+
+    if p_answers ? v_q.id then
+      v_raw_ans := p_answers -> v_q.id;
+      if v_raw_ans is not null and jsonb_typeof(v_raw_ans) != 'null' then
+        if jsonb_typeof(v_raw_ans) = 'array' then
+          select string_agg(lower(btrim(elem)), ' ')
+          into v_user_ans
+          from jsonb_array_elements_text(v_raw_ans) as elem;
+        else
+          v_user_ans := btrim(both '"' from (p_answers ->> v_q.id));
+        end if;
+      end if;
+    end if;
+
+    if v_user_ans is not null and btrim(v_user_ans) != '' then
+      if v_q.validation_type = 'word-order' or v_q.question_type = 'word-order' then
+        -- Normalisasi urutan kata baik dari JSON array maupun string
+        v_expected_ans := regexp_replace(
+          lower(btrim(replace(replace(replace(replace(v_q.expected_answer, '[', ''), ']', ''), '"', ''), ',', ' '))),
+          '\s+',
+          ' ',
+          'g'
+        );
+        v_user_ans := regexp_replace(
+          lower(btrim(replace(replace(replace(replace(v_user_ans, '[', ''), ']', ''), '"', ''), ',', ' '))),
+          '\s+',
+          ' ',
+          'g'
+        );
+        if v_expected_ans = v_user_ans and v_expected_ans != '' then
+          v_is_correct := true;
+        end if;
+      else
+        if lower(btrim(v_q.expected_answer)) = lower(btrim(v_user_ans)) then
+          v_is_correct := true;
+        end if;
+      end if;
+    end if;
+
+    if v_is_correct then
+      v_correct_count := v_correct_count + 1;
+    end if;
+
+    v_results := v_results || jsonb_build_object(
+      'question_id', v_q.id,
+      'is_correct', v_is_correct,
+      'explanation', v_q.explanation
+    );
+  end loop;
+
+  -- 4. Guard kritis: lesson dengan 0 soal published TIDAK BOLEH lulus otomatis
+  if v_total_questions = 0 then
+    return jsonb_build_object(
+      'ok', false,
+      'passed', false,
+      'score', 0,
+      'correct_count', 0,
+      'total_questions', 0,
+      'pass_threshold', v_pass_threshold,
+      'gained_xp', 0,
+      'already_rewarded', false,
+      'current_xp', coalesce(v_current_xp, 0),
+      'current_level', coalesce(v_current_level, 1),
+      'completion_status', 'incomplete',
+      'lesson_id', v_lesson.id,
+      'unit_id', v_unit_id,
+      'details', '[]'::jsonb,
+      'message', 'Lesson ini belum memiliki soal aktif yang dipublikasikan.'
+    );
+  end if;
+
+  -- 5. Hitung skor persentase dan status kelulusan
+  v_score := round((v_correct_count::numeric / v_total_questions::numeric) * 100);
+  v_passed := (v_score >= v_pass_threshold);
+
+  -- 6. Simpan rekam jejak attempt
+  insert into public.lesson_attempts (
+    user_id, lesson_id, lesson_version, score, passed, answers_snapshot, created_at
+  ) values (
+    v_user_id, v_lesson.id, coalesce(v_lesson.version, 1), v_score, v_passed, p_answers, now()
+  );
+
+  -- 7. Cek apakah lesson/unit ini sudah pernah diselesaikan sebelumnya
+  select exists (
+    select 1 from public.lesson_progress
+    where user_id = v_user_id
+      and lesson_unit_id in (v_unit_id, v_lesson.id)
+      and status = 'completed'
+  ) into v_already_completed;
+
+  -- 8. Jika lulus, catat penyelesaian dan berikan XP maksimal satu kali per pengguna
+  if v_passed then
+    insert into public.lesson_progress (user_id, lesson_unit_id, status, score, completed_at, updated_at)
+    values (v_user_id, v_unit_id, 'completed', v_score, now(), now())
+    on conflict (user_id, lesson_unit_id) do update
+      set status = 'completed',
+          score = greatest(lesson_progress.score, excluded.score),
+          updated_at = now();
+
+    if not v_already_completed then
+      v_idempotency_key := 'lesson:' || v_user_id || ':' || v_unit_id;
+      insert into public.wallet_transactions (user_id, source_type, source_id, delta_coins, delta_xp, idempotency_key)
+      values (v_user_id, 'lesson_reward', v_unit_id, 0, v_reward_xp, v_idempotency_key)
+      on conflict (idempotency_key) do nothing;
+
+      if found then
+        v_gained_xp := v_reward_xp;
+        update public.profiles
+        set
+          xp = xp + v_gained_xp,
+          level = case
+            when (xp + v_gained_xp) >= 1000 then 5
+            when (xp + v_gained_xp) >= 600 then 4
+            when (xp + v_gained_xp) >= 300 then 3
+            when (xp + v_gained_xp) >= 100 then 2
+            else 1
+          end,
+          updated_at = now()
+        where user_id = v_user_id
+        returning xp, level into v_current_xp, v_current_level;
+      else
+        v_already_completed := true;
+      end if;
+    end if;
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'passed', v_passed,
+    'score', v_score,
+    'correct_count', v_correct_count,
+    'total_questions', v_total_questions,
+    'pass_threshold', v_pass_threshold,
+    'gained_xp', v_gained_xp,
+    'already_rewarded', v_already_completed,
+    'current_xp', coalesce(v_current_xp, 0),
+    'current_level', coalesce(v_current_level, 1),
+    'completion_status', case
+      when v_passed or v_already_completed then 'completed'
+      else 'unlocked'
+    end,
+    'lesson_id', v_lesson.id,
+    'unit_id', v_unit_id,
+    'details', v_results,
+    'message', case
+      when v_passed and v_already_completed then 'Latihan ulang berhasil diselesaikan (XP hanya diberikan pada kelulusan pertama).'
+      when v_passed then 'Selamat! Kamu lulus lesson ini.'
+      else 'Kamu belum mencapai batas kelulusan minimum (' || v_pass_threshold || '%). Silakan coba lagi!'
+    end
+  );
+end;
+$$;
+
+grant execute on function public.grade_lesson_attempt_atomic(text, jsonb) to authenticated;
+
+
+-- ----------------------------------------------------------------------------
+-- SOURCE: 20261103000011_fix_lesson_progress_permissions.sql
+-- ----------------------------------------------------------------------------
+-- ==============================================================================
+-- Migration: 20261103000011_fix_lesson_progress_permissions.sql
+-- Description: Phase 2 High-Severity Security Fix â€” Remove direct client write
+--              policies on lesson_progress, claimed_rewards, inventory_items,
+--              mission_progress, and lesson_attempts; enforce starter balances
+--              on profile creation; validate avatar item ownership.
+-- ==============================================================================
+
+-- 1. Lock down public.lesson_progress (SELECT only for owner/admin; writes via SECURITY DEFINER RPC)
+drop policy if exists "lesson_progress_owner" on public.lesson_progress;
+drop policy if exists "lesson_progress_insert_own" on public.lesson_progress;
+drop policy if exists "lesson_progress_update_own" on public.lesson_progress;
+drop policy if exists "lesson_progress_delete_own" on public.lesson_progress;
+drop policy if exists "lesson_progress_select_own_or_admin" on public.lesson_progress;
+drop policy if exists "lesson_progress_admin_all" on public.lesson_progress;
+
+create policy "lesson_progress_select_own_or_admin" on public.lesson_progress
+  for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
+
+create policy "lesson_progress_admin_all" on public.lesson_progress
+  for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'))
+  with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
+
+-- 2. Lock down public.claimed_rewards (SELECT only for owner/admin; writes via claim_mission_reward_atomic)
+drop policy if exists "claimed_rewards_owner" on public.claimed_rewards;
+drop policy if exists "claimed_rewards_select_own_or_admin" on public.claimed_rewards;
+drop policy if exists "claimed_rewards_admin_all" on public.claimed_rewards;
+
+create policy "claimed_rewards_select_own_or_admin" on public.claimed_rewards
+  for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
+
+create policy "claimed_rewards_admin_all" on public.claimed_rewards
+  for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'))
+  with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
+
+-- 3. Lock down public.inventory_items (SELECT only for owner/admin; writes via buy_store_item_atomic / starter trigger)
+drop policy if exists "inventory_items_owner" on public.inventory_items;
+drop policy if exists "inventory_items_select_own_or_admin" on public.inventory_items;
+drop policy if exists "inventory_items_admin_all" on public.inventory_items;
+
+create policy "inventory_items_select_own_or_admin" on public.inventory_items
+  for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
+
+create policy "inventory_items_admin_all" on public.inventory_items
+  for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'))
+  with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
+
+-- 4. Lock down public.mission_progress (SELECT only for owner/admin; writes via verify_mission_objective_atomic & claim_mission_reward_atomic)
+drop policy if exists "mission_progress_owner" on public.mission_progress;
+drop policy if exists "mission_progress_select_own_or_admin" on public.mission_progress;
+drop policy if exists "mission_progress_admin_all" on public.mission_progress;
+
+create policy "mission_progress_select_own_or_admin" on public.mission_progress
+  for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
+
+create policy "mission_progress_admin_all" on public.mission_progress
+  for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'))
+  with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
+
+-- 5. Lock down public.lesson_attempts (SELECT only for owner/admin; inserts via grade_lesson_attempt_atomic)
+drop policy if exists "lesson_attempts_owner_insert" on public.lesson_attempts;
+drop policy if exists "lesson_attempts_admin_all" on public.lesson_attempts;
+
+create policy "lesson_attempts_admin_all" on public.lesson_attempts
+  for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'))
+  with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
+
+-- 6. Strengthen profile economy protection trigger to cover both INSERT and UPDATE
+create or replace function public.protect_profile_economy_fields()
+returns trigger language plpgsql as $$
+begin
+  -- Allow SECURITY DEFINER functions (running as postgres/table owner) and service_role
+  if current_user not in ('authenticated', 'anon') then
+    return new;
+  end if;
+
+  if public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role') then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    -- Force canonical starter balances for new learner profiles created from client
+    new.coins := 1000;
+    new.xp := 0;
+    new.level := 1;
+    new.hearts := 5;
+    new.streak_days := 1;
+  elsif tg_op = 'UPDATE' then
+    -- Retain authoritative server economy values on client profile updates
+    new.coins := old.coins;
+    new.xp := old.xp;
+    new.level := old.level;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_protect_profile_economy on public.profiles;
+create trigger on_protect_profile_economy
+  before insert or update on public.profiles
+  for each row execute function public.protect_profile_economy_fields();
+
+-- 7. Automatically seed starter inventory and initial mission progress when a profile is created
+create or replace function public.seed_starter_player_data()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.inventory_items (user_id, item_id)
+  values
+    (new.user_id, 'hair-short-black'),
+    (new.user_id, 'hair-bob-brown'),
+    (new.user_id, 'hair-curly-dark'),
+    (new.user_id, 'top-hoodie-lavender'),
+    (new.user_id, 'top-basic-tee'),
+    (new.user_id, 'bottom-dark-pants'),
+    (new.user_id, 'bottom-blue-jeans'),
+    (new.user_id, 'bottom-casual-skirt'),
+    (new.user_id, 'shoes-white')
+  on conflict (user_id, item_id) do nothing;
+
+  insert into public.mission_progress (user_id, mission_id, status, completed_objective_ids, updated_at)
+  values
+    (new.user_id, 'intro', 'active', '{}', now()),
+    (new.user_id, 'hobby', 'available', '{}', now()),
+    (new.user_id, 'weekend', 'locked', '{}', now())
+  on conflict (user_id, mission_id) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_profile_created_seed_starter on public.profiles;
+create trigger on_profile_created_seed_starter
+  after insert on public.profiles
+  for each row execute function public.seed_starter_player_data();
+
+-- 8. Validate avatar_configs so learners can only equip starter items or owned inventory_items
+create or replace function public.is_avatar_item_allowed(p_user_id uuid, p_item_id text)
+returns boolean language sql security definer stable set search_path = public as $$
+  select
+    p_item_id is null
+    or p_item_id in (
+      'skin-light',
+      'skin-medium',
+      'skin-tan',
+      'skin-dark',
+      'hair-short-black',
+      'hair-bob-brown',
+      'hair-curly-dark',
+      'hair-long-wave',
+      'top-hoodie-lavender',
+      'top-basic-tee',
+      'top-tshirt-blue',
+      'bottom-dark-pants',
+      'bottom-blue-jeans',
+      'bottom-casual-skirt',
+      'bottom-beige-shorts',
+      'shoes-white'
+    )
+    or exists (
+      select 1 from public.inventory_items
+      where user_id = p_user_id and item_id = p_item_id
+    );
+$$;
+
+create or replace function public.validate_avatar_config_ownership()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_avatar_item_allowed(new.user_id, new.skin_tone_id)
+     or not public.is_avatar_item_allowed(new.user_id, new.hair_id)
+     or not public.is_avatar_item_allowed(new.user_id, new.top_id)
+     or not public.is_avatar_item_allowed(new.user_id, new.bottom_id)
+     or not public.is_avatar_item_allowed(new.user_id, new.shoes_id)
+     or not public.is_avatar_item_allowed(new.user_id, new.accessory_id) then
+    raise exception 'Akses ditolak: Kamu belum memiliki salah satu item avatar yang dipilih.';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_validate_avatar_config_ownership on public.avatar_configs;
+create trigger on_validate_avatar_config_ownership
+  before insert or update on public.avatar_configs
+  for each row execute function public.validate_avatar_config_ownership();
+
+
+-- ----------------------------------------------------------------------------
+-- SOURCE: 20261103000012_fix_room_membership_rls.sql
+-- ----------------------------------------------------------------------------
+-- ==============================================================================
+-- Migration: 20261103000012_fix_room_membership_rls.sql
+-- Description: Phase 3 Critical Multiplayer Fix â€” Resolve infinite RLS recursion
+--              on public.room_memberships and public.world_rooms, and enforce
+--              concurrency-safe capacity locking in join_world_room.
+-- ==============================================================================
+
+-- 1. Safe SECURITY DEFINER helpers to break direct and mutual RLS recursion
+create or replace function public.get_my_active_room_id()
+returns text language sql security definer stable set search_path = public as $$
+  select room_id
+  from public.room_memberships
+  where user_id = auth.uid()
+  limit 1;
+$$;
+
+create or replace function public.is_public_active_room(p_room_id text)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1
+    from public.world_rooms
+    where id = p_room_id
+      and visibility = 'public'
+      and status = 'active'
+  );
+$$;
+
+grant execute on function public.get_my_active_room_id() to authenticated, anon;
+grant execute on function public.is_public_active_room(text) to authenticated, anon;
+
+-- 2. Replace recursive policies on public.world_rooms and public.room_memberships
+drop policy if exists "world_rooms_select_accessible" on public.world_rooms;
+create policy "world_rooms_select_accessible" on public.world_rooms
+  for select using (
+    visibility = 'public'
+    or auth.uid() = created_by
+    or id = public.get_my_active_room_id()
+    or public.is_admin(auth.uid())
+  );
+
+drop policy if exists "room_memberships_select_room" on public.room_memberships;
+create policy "room_memberships_select_room" on public.room_memberships
+  for select using (
+    auth.uid() = user_id
+    or room_id = public.get_my_active_room_id()
+    or public.is_public_active_room(room_id)
+    or public.is_admin(auth.uid())
+  );
+
+-- 3. Harden join_world_room with row-level lock (FOR UPDATE) to prevent capacity race conditions
+create or replace function public.join_world_room(
+  p_room_id text,
+  p_invite_code text default null
+)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_room record;
+  v_other_count integer := 0;
+  v_pair_a uuid;
+  v_pair_b uuid;
+begin
+  if v_user_id is null then
+    raise exception 'Akses ditolak: Pengguna harus login.';
+  end if;
+
+  -- 1. Lock baris room secara eksklusif agar dua pemain bersamaan tidak melebihi kapasitas
+  select *
+  into v_room
+  from public.world_rooms
+  where id = p_room_id
+    and status = 'active'
+  for update;
+
+  if not found then
+    return jsonb_build_object(
+      'ok', false,
+      'code', 'ROOM_NOT_FOUND',
+      'message', 'Room tidak ditemukan atau telah ditutup.'
+    );
+  end if;
+
+  -- 2. Bersihkan membership kadaluarsa (> 90 detik tanpa heartbeat)
+  delete from public.room_memberships
+  where last_heartbeat_at < (now() - interval '90 seconds');
+
+  -- 3. Validasi izin akses berdasarkan visibility sebelum memeriksa kapasitas
+  if v_room.visibility = 'private' and v_room.created_by is distinct from v_user_id and not public.is_admin(v_user_id) then
+    if p_invite_code is null or upper(btrim(p_invite_code)) != upper(btrim(coalesce(v_room.invite_code, ''))) then
+      return jsonb_build_object(
+        'ok', false,
+        'code', 'INVALID_INVITE',
+        'message', 'Kode undangan tidak valid untuk room privat ini.'
+      );
+    end if;
+  elsif v_room.visibility = 'friends_only' and v_room.created_by is distinct from v_user_id and not public.is_admin(v_user_id) then
+    if v_room.created_by is null then
+      return jsonb_build_object(
+        'ok', false,
+        'code', 'NOT_FRIEND',
+        'message', 'Room ini khusus teman pembuat room.'
+      );
+    end if;
+    v_pair_a := least(v_user_id, v_room.created_by);
+    v_pair_b := greatest(v_user_id, v_room.created_by);
+    if not exists (select 1 from public.friendships where user_a = v_pair_a and user_b = v_pair_b) then
+      return jsonb_build_object(
+        'ok', false,
+        'code', 'NOT_FRIEND',
+        'message', 'Room ini khusus teman pembuat room.'
+      );
+    end if;
+  end if;
+
+  -- 4. Cek kapasitas room (hitung pemain aktif selain diri sendiri)
+  select count(*)
+  into v_other_count
+  from public.room_memberships
+  where room_id = p_room_id
+    and user_id != v_user_id;
+
+  if v_other_count >= v_room.capacity then
+    return jsonb_build_object(
+      'ok', false,
+      'code', 'ROOM_FULL',
+      'message', 'Room sudah penuh (' || v_other_count || '/' || v_room.capacity || '). Silakan pilih room lain.'
+    );
+  end if;
+
+  -- 5. Kebijakan single-active-room: upsert keanggotaan pengguna ke room target
+  insert into public.room_memberships (room_id, user_id, joined_at, last_heartbeat_at)
+  values (p_room_id, v_user_id, now(), now())
+  on conflict (user_id) do update
+    set room_id = excluded.room_id,
+        joined_at = case
+          when room_memberships.room_id = excluded.room_id then room_memberships.joined_at
+          else now()
+        end,
+        last_heartbeat_at = now();
+
+  return jsonb_build_object(
+    'ok', true,
+    'code', 'JOINED',
+    'message', 'Berhasil bergabung ke room.',
+    'room', jsonb_build_object(
+      'id', v_room.id,
+      'world_id', v_room.world_id,
+      'name', v_room.name,
+      'visibility', v_room.visibility,
+      'capacity', v_room.capacity,
+      'channel', 'room:' || v_room.id
+    )
+  );
+end;
+$$;
+
+grant execute on function public.join_world_room(text, text) to authenticated;
+
+
+-- ----------------------------------------------------------------------------
+-- SOURCE: 20261103000013_harden_mission_reward_validation.sql
+-- ----------------------------------------------------------------------------
+-- ==============================================================================
+-- Migration: 20261103000013_harden_mission_reward_validation.sql
+-- Description: Phase 7 High-Severity Security Fix â€” Add server-authoritative
+--              mission objective definitions, verify_mission_objective_atomic RPC,
+--              and enforce completed objective verification inside
+--              claim_mission_reward_atomic before granting coins/XP.
+-- ==============================================================================
+
+-- 1. Server-Authoritative Mission Objectives Table
+create table if not exists public.mission_objective_definitions (
+  mission_id text not null references public.mission_definitions (id) on delete cascade,
+  id text not null,
+  label text not null,
+  keywords text[] not null default '{}',
+  order_index integer not null default 1,
+  primary key (mission_id, id)
+);
+
+alter table public.mission_objective_definitions enable row level security;
+
+drop policy if exists "mission_objective_definitions_read_all" on public.mission_objective_definitions;
+create policy "mission_objective_definitions_read_all" on public.mission_objective_definitions
+  for select using (true);
+
+drop policy if exists "mission_objective_definitions_admin_all" on public.mission_objective_definitions;
+create policy "mission_objective_definitions_admin_all" on public.mission_objective_definitions
+  for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'))
+  with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
+
+-- Seed authoritative objectives matching the 3 NPC missions
+insert into public.mission_objective_definitions (mission_id, id, label, keywords, order_index)
+values
+  ('intro', 'name', 'Sampaikan nama', array['my name', 'i am', 'call me'], 1),
+  ('intro', 'origin', 'Sampaikan asal atau kampus', array['from', 'live in', 'study at'], 2),
+  ('intro', 'interest', 'Sampaikan satu hal yang disukai', array['like', 'love', 'enjoy', 'hobby'], 3),
+  ('hobby', 'ask-hobby', 'Tanyakan hobi NPC', array['what do you like', 'your hobby', 'like to do'], 1),
+  ('hobby', 'own-hobby', 'Ceritakan hobi sendiri', array['my hobby', 'i like', 'i enjoy', 'i love'], 2),
+  ('hobby', 'follow-up', 'Beri satu pertanyaan lanjutan', array['how often', 'why', 'when do you'], 3),
+  ('weekend', 'ask-plan', 'Tanyakan rencana akhir pekan', array['what will you do', 'weekend', 'plan'], 1),
+  ('weekend', 'own-plan', 'Jelaskan rencana sendiri', array['i will', 'i am going', 'visit'], 2),
+  ('weekend', 'polite-close', 'Tutup percakapan dengan sopan', array['see you', 'sounds great', 'thank you', 'later'], 3)
+on conflict (mission_id, id) do update set
+  label = excluded.label,
+  keywords = excluded.keywords,
+  order_index = excluded.order_index;
+
+-- 2. RPC: verify_mission_objective_atomic
+create or replace function public.verify_mission_objective_atomic(
+  p_mission_id text,
+  p_user_input text
+)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_mission record;
+  v_norm_input text;
+  v_existing_ids text[] := '{}';
+  v_next_ids text[] := '{}';
+  v_obj record;
+  v_kw text;
+  v_matched boolean;
+  v_total_objectives integer := 0;
+  v_all_completed boolean := false;
+  v_status text := 'active';
+begin
+  if v_user_id is null then
+    raise exception 'Akses ditolak: Pengguna harus login.';
+  end if;
+
+  select * into v_mission
+  from public.mission_definitions
+  where id = p_mission_id and is_active = true;
+
+  if not found then
+    raise exception 'Definisi misi tidak ditemukan: %', p_mission_id;
+  end if;
+
+  v_norm_input := lower(btrim(coalesce(p_user_input, '')));
+  if char_length(v_norm_input) < 2 or char_length(v_norm_input) > 200 then
+    return jsonb_build_object(
+      'ok', false,
+      'message', 'Kalimat percakapan harus terdiri dari 2 hingga 200 karakter.'
+    );
+  end if;
+
+  -- Cek prasyarat misi weekend (harus menyelesaikan intro terlebih dahulu)
+  if p_mission_id = 'weekend' then
+    if not exists (
+      select 1 from public.mission_progress
+      where user_id = v_user_id and mission_id = 'intro' and status = 'completed'
+    ) and not exists (
+      select 1 from public.claimed_rewards
+      where user_id = v_user_id and mission_id = 'intro'
+    ) then
+      return jsonb_build_object(
+        'ok', false,
+        'message', 'Selesaikan misi Perkenalan Diri terlebih dahulu untuk membuka misi Rencana Akhir Pekan.'
+      );
+    end if;
+  end if;
+
+  select coalesce(completed_objective_ids, '{}')
+  into v_existing_ids
+  from public.mission_progress
+  where user_id = v_user_id and mission_id = p_mission_id
+  for update;
+
+  v_next_ids := coalesce(v_existing_ids, '{}');
+
+  for v_obj in (
+    select id, keywords
+    from public.mission_objective_definitions
+    where mission_id = p_mission_id
+    order by order_index asc
+  ) loop
+    v_total_objectives := v_total_objectives + 1;
+    if not (v_obj.id = any(v_next_ids)) then
+      v_matched := false;
+      foreach v_kw in array v_obj.keywords loop
+        if position(lower(v_kw) in v_norm_input) > 0 then
+          v_matched := true;
+          exit;
+        end if;
+      end loop;
+
+      if v_matched then
+        v_next_ids := array_append(v_next_ids, v_obj.id);
+      end if;
+    end if;
+  end loop;
+
+  v_all_completed := (v_total_objectives > 0 and coalesce(cardinality(v_next_ids), 0) >= v_total_objectives);
+  v_status := case when v_all_completed then 'completed' else 'active' end;
+
+  insert into public.mission_progress (user_id, mission_id, status, completed_objective_ids, updated_at)
+  values (v_user_id, p_mission_id, v_status, v_next_ids, now())
+  on conflict (user_id, mission_id) do update
+    set status = case
+          when mission_progress.status = 'completed' then 'completed'
+          else excluded.status
+        end,
+        completed_objective_ids = excluded.completed_objective_ids,
+        updated_at = now();
+
+  return jsonb_build_object(
+    'ok', true,
+    'mission_id', p_mission_id,
+    'completed_objective_ids', to_jsonb(v_next_ids),
+    'total_objectives', v_total_objectives,
+    'all_completed', v_all_completed,
+    'status', v_status
+  );
+end;
+$$;
+
+grant execute on function public.verify_mission_objective_atomic(text, text) to authenticated;
+
+-- 3. Harden claim_mission_reward_atomic to require verified objective completion
+create or replace function public.claim_mission_reward_atomic(p_mission_id text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_mission record;
+  v_idempotency_key text;
+  v_required_objectives text[];
+  v_completed_objectives text[];
+  v_missing_count integer := 0;
+  v_new_coins integer;
+  v_new_xp integer;
+  v_new_level integer;
+begin
+  if v_user_id is null then
+    raise exception 'Akses ditolak: Pengguna harus login.';
+  end if;
+
+  -- 1. Validasi definisi misi server
+  select * into v_mission
+  from public.mission_definitions
+  where id = p_mission_id and is_active = true;
+
+  if not found then
+    raise exception 'Definisi misi tidak ditemukan: %', p_mission_id;
+  end if;
+
+  -- 2. Lock baris profil pengguna untuk mencegah race condition klaim ganda
+  select coins, xp, level
+  into v_new_coins, v_new_xp, v_new_level
+  from public.profiles
+  where user_id = v_user_id
+  for update;
+
+  -- 3. Cek apakah sudah pernah diklaim sebelumnya (idempotency check)
+  v_idempotency_key := 'mission:' || v_user_id || ':' || p_mission_id;
+
+  if exists (
+    select 1 from public.claimed_rewards
+    where user_id = v_user_id and mission_id = p_mission_id
+  ) then
+    return jsonb_build_object(
+      'ok', false,
+      'message', 'Reward misi ini sudah pernah diklaim sebelumnya.',
+      'already_claimed', true,
+      'coins', coalesce(v_new_coins, 0),
+      'xp', coalesce(v_new_xp, 0),
+      'level', coalesce(v_new_level, 1)
+    );
+  end if;
+
+  -- 4. Verifikasi bahwa seluruh objektif misi benar-benar telah diselesaikan di server
+  select coalesce(array_agg(id), '{}')
+  into v_required_objectives
+  from public.mission_objective_definitions
+  where mission_id = p_mission_id;
+
+  select coalesce(completed_objective_ids, '{}')
+  into v_completed_objectives
+  from public.mission_progress
+  where user_id = v_user_id and mission_id = p_mission_id;
+
+  if cardinality(v_required_objectives) > 0 then
+    select count(*)
+    into v_missing_count
+    from unnest(v_required_objectives) as req_id
+    where not (req_id = any(coalesce(v_completed_objectives, '{}')));
+
+    if v_missing_count > 0 then
+      return jsonb_build_object(
+        'ok', false,
+        'code', 'MISSION_INCOMPLETE',
+        'message', 'Seluruh objektif percakapan misi harus diselesaikan terlebih dahulu sebelum mengklaim hadiah.',
+        'already_claimed', false
+      );
+    end if;
+  end if;
+
+  -- 5. Catat di ledger transaksi dompet
+  insert into public.wallet_transactions (user_id, source_type, source_id, delta_coins, delta_xp, idempotency_key)
+  values (v_user_id, 'mission_reward', p_mission_id, v_mission.reward_coins, v_mission.reward_xp, v_idempotency_key)
+  on conflict (idempotency_key) do nothing;
+
+  if not found then
+    return jsonb_build_object(
+      'ok', false,
+      'message', 'Reward misi ini sudah pernah diklaim sebelumnya.',
+      'already_claimed', true,
+      'coins', coalesce(v_new_coins, 0),
+      'xp', coalesce(v_new_xp, 0),
+      'level', coalesce(v_new_level, 1)
+    );
+  end if;
+
+  -- 6. Catat status misi dan klaim
+  insert into public.claimed_rewards (user_id, mission_id)
+  values (v_user_id, p_mission_id)
+  on conflict (user_id, mission_id) do nothing;
+
+  insert into public.mission_progress (user_id, mission_id, status, completed_objective_ids, updated_at)
+  values (v_user_id, p_mission_id, 'completed', coalesce(v_completed_objectives, v_required_objectives), now())
+  on conflict (user_id, mission_id) do update
+    set status = 'completed',
+        updated_at = now();
+
+  -- Buka misi weekend jika intro selesai
+  if p_mission_id = 'intro' then
+    insert into public.mission_progress (user_id, mission_id, status)
+    values (v_user_id, 'weekend', 'available')
+    on conflict (user_id, mission_id) do update
+      set status = case when mission_progress.status = 'locked' then 'available' else mission_progress.status end,
+          updated_at = now();
+  end if;
+
+  -- 7. Update profil koin, xp, dan level secara atomik
+  update public.profiles
+  set
+    coins = coins + v_mission.reward_coins,
+    xp = xp + v_mission.reward_xp,
+    level = case
+      when (xp + v_mission.reward_xp) >= 1000 then 5
+      when (xp + v_mission.reward_xp) >= 600 then 4
+      when (xp + v_mission.reward_xp) >= 300 then 3
+      when (xp + v_mission.reward_xp) >= 100 then 2
+      else 1
+    end,
+    updated_at = now()
+  where user_id = v_user_id
+  returning coins, xp, level into v_new_coins, v_new_xp, v_new_level;
+
+  return jsonb_build_object(
+    'ok', true,
+    'message', 'Reward misi berhasil diklaim!',
+    'already_claimed', false,
+    'gained_coins', v_mission.reward_coins,
+    'gained_xp', v_mission.reward_xp,
+    'coins', v_new_coins,
+    'xp', v_new_xp,
+    'level', v_new_level
+  );
+end;
+$$;
+
+grant execute on function public.claim_mission_reward_atomic(text) to authenticated;
+
+
+-- ============================================================================
+-- OPSIONAL: MENJADIKAN AKUN ANDA SEBAGAI ADMIN
+-- Jalankan query di bawah ini (ganti email sesuai akun Anda) setelah mendaftar:
+-- ============================================================================
+-- insert into public.user_roles (user_id, role)
+-- select id, 'admin'::public.app_role
+-- from auth.users
+-- where email = 'email_kamu@domain.com'
+-- on conflict (user_id, role) do nothing;
