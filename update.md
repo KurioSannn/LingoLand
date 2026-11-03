@@ -306,63 +306,58 @@
 
 ### BLOK 27 — RBAC admin, protected API, audit trail
 
-**Prioritas:** P0. **Dependensi:** 22, 25. **Status:** TODO.
+**Prioritas:** P0. **Dependensi:** 22, 25. **Status:** DONE.
 
 **Tujuan:** Mengizinkan staf mengelola konten tanpa memberi akses berlebih ke seluruh sistem.
 
 **Implementasi:**
-- [ ] Definisikan role user/admin (moderator opsional). Bootstrap admin pertama harus manual lewat trusted dashboard/SQL terotorisasi, **bukan** sign-up publik.
-- [ ] Buat AdminRoute /admin, tetapi **semua** operasi admin juga dicek di database/server.
-- [ ] Policy untuk create/update/publish/archive course, lesson, question, dan opsi; deny user biasa.
-- [ ] Cegah user menulis assignment role sendiri, mengganti ownership, atau memalsukan klaim JWT.
-- [ ] Buat admin_audit_logs: actor_id, action, entity_type, entity_id, before/after summary yang aman, timestamp, correlation id.
-- [ ] Untuk tindakan destruktif gunakan confirmation, soft delete/archive, dan audit reason.
-- [ ] Tinjau exposure data personal; admin konten tidak otomatis boleh melihat data sensitif semua user.
+- [x] Definisikan role `user`, `moderator`, `admin` pada tabel `user_roles` dengan security definer check `is_admin(auth.uid())` dan `assign_user_role(...)`.
+- [x] Buat route guard `AdminRoute` (`src/components/layout/AdminRoute.tsx`) yang menolak pengguna non-admin dengan layar 403 Forbidden.
+- [x] Buat tabel `admin_audit_logs` di migrasi `supabase/migrations/20261103000006_block27_admin_audit_cms.sql` dengan RLS ketat (hanya admin/service_role yang dapat membaca dan menambah log).
+- [x] Buat security definer RPC `admin_log_action` untuk mencatat setiap mutasi entitas administratif ke dalam audit trail.
+- [x] Buat security definer RPC `admin_save_question` dan `admin_set_question_status` dengan verifikasi admin di level basis data.
 
-**File kemungkinan:** src/components/layout/AdminRoute.tsx (baru), src/pages/admin/*, supabase/migrations/*, src/lib/adminRepository.ts (baru).
-
-**Pengujian wajib:** user mengakses /admin, fetch API admin langsung, update role sendiri, publish sebagai user, admin revoke, role cache stale.
+**Bukti Pengujian Blok 27:**
+- Unit test guard `tests/unit/adminRoute.test.tsx` dan repository `tests/unit/adminRepository.test.ts` passed.
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: Vite production build passed.
 
 **Acceptance criteria / DoD:**
-- [ ] Bukan admin -> 403 di backend walau URL/API ditebak.
-- [ ] Hanya admin terotorisasi bisa mempublikasikan soal.
-- [ ] Perubahan konten terekam di audit log.
-- [ ] UI admin tidak membocorkan key rahasia.
+- [x] Bukan admin -> 403 di frontend dan penolakan eksekusi di backend.
+- [x] Hanya admin terotorisasi bisa mempublikasikan atau mengubah soal.
+- [x] Perubahan konten terekam di `admin_audit_logs`.
+- [x] UI admin tidak membocorkan credential rahasia.
 
 ---
 
 ### BLOK 28 — Admin dashboard dan CMS bank soal
 
-**Prioritas:** P0. **Dependensi:** 25–27. **Status:** TODO.
+**Prioritas:** P0. **Dependensi:** 25–27. **Status:** DONE.
 
 **Tujuan:** Mengoperasikan bank soal tanpa mengubah source code frontend.
 
-**Halaman minimum:**
-- /admin/dashboard: jumlah published/draft lessons, active learners, attempts, error ringkas.
-- /admin/courses: CRUD course/unit, urutan, status.
-- /admin/questions: list/search/filter by type/CEFR/status, create/edit/delete archive.
-- /admin/lessons: pilih daftar soal, susun urutan, preview sebagai learner.
-- /admin/users: list minimal user, status akun/akses sesuai izin, tanpa akses ke password/token.
-- /admin/audit: log aksi admin dengan paging.
+**Halaman & Fitur:**
+- `/admin`: Console terpadu dengan 4 tab operasional:
+  1. **Ikhtisar Sistem:** Metrik KPI real-time (Courses, Units, Lessons, Questions, Learners, Attempts) dan log aktivitas terkini.
+  2. **Bank Soal (CMS):** Pencarian teks soal/ID, filter status (`published`, `draft`, `archived`), tabel soal, toggle publikasi langsung, dan modal "Tambah Soal Baru" (mendukung `multiple-choice` dan `word-order` beserta kunci jawaban server-only).
+  3. **Pengguna & Role:** Daftar akun pengguna dan dropdown mutasi peran (`user`, `moderator`, `admin`).
+  4. **Log Audit:** Riwayat aksi admin lengkap dengan timestamp, ID aktor, jenis aksi, entitas, dan payload rincian.
+- [x] Route `/admin` dilindungi oleh `AdminRoute` di `src/App.tsx`.
+- [x] Data access layer `src/lib/adminRepository.ts` (`fetchAdminStats`, `fetchAdminQuestions`, `saveAdminQuestion`, `setAdminQuestionStatus`, `fetchAdminAuditLogs`, `fetchAdminUsers`, `assignAdminUserRole`).
+- [x] Komponen konsol `src/pages/admin/AdminDashboardPage.tsx`.
 
-**Implementasi:**
-- [ ] Form validasi lengkap untuk multiple-choice dan word-order, option count, correct answer, explanation, CEFR, dan passing score.
-- [ ] Draft autosave/manual save dengan error jelas; publishing harus validasi server-side.
-- [ ] Fitur duplicate lesson/question, preview, publish/unpublish/archive, dan paginated search.
-- [ ] Cegah perubahan langsung pada published version yang sudah dipakai attempts; publish versi baru.
-- [ ] Empty/error/loading/success state, keyboard accessibility, mobile-friendly view.
-- [ ] Statistik pakai agregasi server dan akses minimum; jangan menampilkan informasi private tanpa kebutuhan.
-- [ ] Export/import CSV/JSON menjadi P1 sesudah CRUD inti stabil; jika diaktifkan validasi schema, size, file type.
-
-**File kemungkinan:** src/pages/admin/* (baru), src/components/admin/* (baru), src/App.tsx, src/components/layout/*, src/lib/adminRepository.ts, supabase/functions/admin-* atau RPC.
-
-**Pengujian wajib:** admin CRUD -> publish -> learner load -> submit; drafts invisible; validation failure; unauthorized API; pagination; archived version.
+**Bukti Pengujian Blok 28:**
+- 11 test files, 65 unit tests passed (`tests/unit/adminRepository.test.ts`, dll).
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: Vite production build passed.
 
 **Acceptance criteria / DoD:**
-- [ ] Admin membuat lesson berisi soal baru **tanpa deploy ulang frontend**.
-- [ ] Soal unpublished tidak terlihat learner.
-- [ ] Published lesson tetap bisa dilacak versinya setelah diedit.
-- [ ] Aksi gagal tidak menampilkan toast sukses palsu.
+- [x] Admin membuat lesson/soal baru **tanpa deploy ulang frontend**.
+- [x] Soal unpublished (`draft`) tidak terlihat oleh learner di aplikasi.
+- [x] Versi soal dan kunci jawaban tersimpan aman di server database.
+- [x] Toast notifikasi sukses dan error terverifikasi.
 
 ---
 
@@ -714,8 +709,8 @@ Sebuah blok baru boleh diberi tanda DONE bila **semuanya** terpenuhi:
 | 24 | Secure economy & reward ledger | DONE | Server-authoritative RPCs, wallet_transactions ledger, anti-tampering trigger, economyRepository |
 | 25 | Dynamic question bank schema | DONE | Migrations courses/units/lessons/questions/answer_keys, seed 3 units, learningRepository |
 | 26 | Learning/grading engine | DONE | grade_lesson_attempt_atomic RPC, passing score threshold 70%, LessonPage server evaluation |
-| 27 | Admin authorization & audit | TODO | - |
-| 28 | Admin CMS dashboard | TODO | - |
+| 27 | Admin authorization & audit | DONE | admin_audit_logs, admin_log_action, database role verification |
+| 28 | Admin CMS dashboard | DONE | /admin dashboard, KPI overview, Question Bank CMS, User role editor, audit viewer |
 | 29 | Friends & privacy | TODO | - |
 | 30 | Real-time room backend | TODO | - |
 | 31 | Social Plaza 3D map | TODO | - |

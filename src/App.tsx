@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { AdminRoute } from "./components/layout/AdminRoute";
 import { AppLayout } from "./components/layout/AppLayout";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
+import { AdminDashboardPage } from "./pages/admin/AdminDashboardPage";
 import { AvatarChatPage } from "./pages/AvatarChatPage";
 import { AvatarPage } from "./pages/AvatarPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
@@ -47,6 +49,14 @@ export function App() {
         <Route path="topup" element={<TopUpPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
+      <Route
+        path="/admin"
+        element={
+          <AdminRoute>
+            <AdminDashboardPage />
+          </AdminRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
