@@ -10,17 +10,19 @@ export interface RemoteState {
   inventory: string[];
   missionProgress: Record<string, MissionProgress>;
   claimedRewards: string[];
+  completedLessonIds: string[];
 }
 
 export async function fetchRemoteState(userId: string): Promise<RemoteState | null> {
   if (!supabase) return null;
 
-  const [profileRes, avatarRes, inventoryRes, missionRes, rewardsRes, role] = await Promise.all([
+  const [profileRes, avatarRes, inventoryRes, missionRes, rewardsRes, lessonsRes, role] = await Promise.all([
     supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("avatar_configs").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("inventory_items").select("item_id").eq("user_id", userId),
     supabase.from("mission_progress").select("*").eq("user_id", userId),
     supabase.from("claimed_rewards").select("mission_id").eq("user_id", userId),
+    supabase.from("lesson_progress").select("lesson_unit_id").eq("user_id", userId),
     fetchUserRole(userId),
   ]);
 
@@ -65,23 +67,27 @@ export async function fetchRemoteState(userId: string): Promise<RemoteState | nu
     inventory: (inventoryRes.data ?? []).map((row) => row.item_id as string),
     missionProgress,
     claimedRewards: (rewardsRes.data ?? []).map((row) => row.mission_id as string),
+    completedLessonIds: (lessonsRes.data ?? []).map((row) => row.lesson_unit_id as string),
   };
 }
 
-async function replaceRows(table: string, userId: string, rows: Record<string, unknown>[]) {
-  if (!supabase) return;
-  await supabase.from(table).delete().eq("user_id", userId);
-  if (rows.length > 0) await supabase.from(table).insert(rows);
+async function upsertRows(table: string, rows: Record<string, unknown>[], onConflict: string) {
+  if (!supabase || rows.length === 0) return;
+  const { error } = await supabase.from(table).upsert(rows, { onConflict });
+  if (error) {
+    throw new Error(`Gagal menyinkronkan data ke tabel ${table}: ${error.message}`);
+  }
 }
 
 export async function pushRemoteState(userId: string, state: DemoState): Promise<void> {
   if (!supabase) return;
 
-  await Promise.all([
+  const [profileRes, avatarRes] = await Promise.all([
     supabase.from("profiles").upsert({
       user_id: userId,
       name: state.user.name,
       username: state.user.username,
+      display_name: state.user.displayName ?? state.user.name,
       level: state.user.level,
       xp: state.user.xp,
       coins: state.user.coins,
@@ -99,14 +105,23 @@ export async function pushRemoteState(userId: string, state: DemoState): Promise
       accessory_id: state.avatar.accessoryId,
       updated_at: new Date().toISOString(),
     }),
-    replaceRows(
+  ]);
+
+  if (profileRes.error) {
+    throw new Error(`Gagal menyimpan profil remote: ${profileRes.error.message}`);
+  }
+  if (avatarRes.error) {
+    throw new Error(`Gagal menyimpan avatar remote: ${avatarRes.error.message}`);
+  }
+
+  await Promise.all([
+    upsertRows(
       "inventory_items",
-      userId,
       state.inventory.map((itemId) => ({ user_id: userId, item_id: itemId })),
+      "user_id,item_id",
     ),
-    replaceRows(
+    upsertRows(
       "mission_progress",
-      userId,
       Object.entries(state.missionProgress).map(([missionId, progress]) => ({
         user_id: userId,
         mission_id: missionId,
@@ -114,11 +129,23 @@ export async function pushRemoteState(userId: string, state: DemoState): Promise
         completed_objective_ids: progress.completedObjectiveIds,
         updated_at: new Date().toISOString(),
       })),
+      "user_id,mission_id",
     ),
-    replaceRows(
+    upsertRows(
       "claimed_rewards",
-      userId,
       state.claimedRewards.map((missionId) => ({ user_id: userId, mission_id: missionId })),
+      "user_id,mission_id",
+    ),
+    upsertRows(
+      "lesson_progress",
+      state.completedLessonIds.map((lessonUnitId) => ({
+        user_id: userId,
+        lesson_unit_id: lessonUnitId,
+        status: "completed",
+        score: 100,
+        updated_at: new Date().toISOString(),
+      })),
+      "user_id,lesson_unit_id",
     ),
   ]);
 }
@@ -131,6 +158,7 @@ export interface HydratePayload {
   missionProgress?: Record<string, MissionProgress>;
   completedMissionIds?: string[];
   claimedRewards?: string[];
+  completedLessonIds?: string[];
 }
 
 // Shared by both the explicit login flow (useDemoAuth) and the background
@@ -178,16 +206,24 @@ export async function resolveHydratePayload(userId: string): Promise<HydratePayl
     missionProgress: remote.missionProgress,
     completedMissionIds,
     claimedRewards: remote.claimedRewards,
+    completedLessonIds: remote.completedLessonIds,
   };
 }
 
 export async function clearRemoteState(userId: string): Promise<void> {
   if (!supabase) return;
-  await Promise.all([
+  const results = await Promise.all([
     supabase.from("profiles").delete().eq("user_id", userId),
     supabase.from("avatar_configs").delete().eq("user_id", userId),
     supabase.from("inventory_items").delete().eq("user_id", userId),
     supabase.from("mission_progress").delete().eq("user_id", userId),
     supabase.from("claimed_rewards").delete().eq("user_id", userId),
+    supabase.from("lesson_progress").delete().eq("user_id", userId),
   ]);
+
+  for (const res of results) {
+    if (res.error) {
+      throw new Error(`Gagal mereset remote state: ${res.error.message}`);
+    }
+  }
 }

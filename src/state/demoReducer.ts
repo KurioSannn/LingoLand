@@ -142,6 +142,7 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
         missionProgress: action.missionProgress ?? state.missionProgress,
         completedMissionIds: action.completedMissionIds ?? state.completedMissionIds,
         claimedRewards: action.claimedRewards ?? state.claimedRewards,
+        completedLessonIds: action.completedLessonIds ?? state.completedLessonIds,
         recentActivity: recent("Login berhasil terhubung ke server.", state.recentActivity),
       };
     default:

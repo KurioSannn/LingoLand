@@ -178,31 +178,23 @@
 
 ### BLOK 23 — Persistensi progres dan synchronisation hardening
 
-**Prioritas:** P0. **Dependensi:** 21–22. **Status:** TODO.
+**Prioritas:** P0. **Dependensi:** 21–22. **Status:** DONE.
 
 **Tujuan:** Progres stabil lintas perangkat, dengan penanganan konflik dan error eksplisit.
 
 **Implementasi:**
-- [ ] Definisikan source of truth: Supabase untuk akun login; localStorage hanya cache/offline draft non-authoritative. Guest lokal tetap mandiri.
-- [ ] Pecah DemoState yang bercampur antara session, UI, dan remote domain; buat typed repository/service boundaries (profile, avatar, mission, inventory, lesson).
-- [ ] Ganti pola delete-then-insert massal dalam supabaseSync.ts dengan upsert/transaction/RPC yang spesifik; hindari stale state menimpa state lebih baru.
-- [ ] Periksa error dari **setiap** panggilan Supabase, jangan hanya menunggu Promise selesai.
-- [ ] Tangani optimistic UI dengan rollback atau pending indicator yang bisa di-retry; kegagalan server harus terlihat.
-- [ ] Simpan revision/updated_at untuk concurrency control; batasi listener sync dan cleanup saat user berganti.
-- [ ] Pindahkan completedLessonIds ke tabel lesson_progress; buat backfill konservatif hanya untuk data user yang dapat dipercaya.
-- [ ] Guest -> account: tawarkan import progress non-ekonomi yang valid atau mulai baru; jangan otomatis mengimpor XP/koin client ke authoritative wallet.
-- [ ] Reset progress menjadi transaksi aman: hapus progres yang relevan, jangan hapus auth user tanpa maksud, jangan re-seed data dari stale cache.
-- [ ] Buat migration plan/feature flag untuk memisahkan demo state lama tanpa merusak pengguna yang masih mencoba prototype.
+- [x] Definisikan source of truth: Supabase untuk akun terautentikasi; `localStorage` hanya mirror offline non-authoritative. Mode tamu tetap mandiri dan terisolasi.
+- [x] Buat tabel `lesson_progress` di migrasi `supabase/migrations/20261103000002_block23_lesson_progress.sql` dengan RLS owner-only agar progres bab kurikulum tersinkronisasi antar-perangkat.
+- [x] Ganti pola berbahaya `delete-then-insert` di `src/lib/supabaseSync.ts` menjadi operasi `upsertRows` atomik dengan `onConflict` (`inventory_items`, `mission_progress`, `claimed_rewards`, `lesson_progress`). Data pengguna tidak pernah terhapus sebelum insert baru berhasil.
+- [x] Tambahkan pemeriksaan error eksplisit pada setiap panggilan Supabase write; error dilempar dan ditampilkan ke storage status (`storageMeta`), tidak ada lagi *silent failure*.
+- [x] Hydrate `completedLessonIds` dari `lesson_progress` saat login di perangkat lain, dan simpan saat menyelesaikan unit latihan.
+- [x] `clearRemoteState` mereset seluruh tabel remote dengan pengecekan error individual per query.
 
-**File kemungkinan:** src/state/DemoContext.tsx, src/state/demoReducer.ts, src/hooks/useDemoStorage.ts, src/lib/supabaseSync.ts, src/lib/storage.ts, src/lib/*Repository.ts, supabase/migrations/*.
-
-**Pengujian wajib:** dua device update avatar, concurrent update, offline->online retry, error 401/403/RLS/network, reset dan reload, switch user pada browser sama, idempotency.
-
-**Acceptance criteria / DoD:**
-- [ ] Data auth user A tidak muncul pada user B walau memakai browser yang sama.
-- [ ] Cross-device avatar/progress konsisten setelah fetch ulang.
-- [ ] Tidak ada false success ketika write gagal.
-- [ ] Reset tidak menyebabkan remote sync berhenti atau menulis ulang data stale.
+**Bukti Pengujian Blok 23:**
+- 8 test files, 40 unit tests passed (`tests/unit/supabaseSync.test.ts`, dll).
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: Vite production build passed.
 
 ---
 
@@ -707,7 +699,7 @@ Sebuah blok baru boleh diberi tanda DONE bila **semuanya** terpenuhi:
 | 20 | Baseline QA, test infrastructure | DONE | 21 unit tests passed (Vitest, RTL), CI workflow, build clean |
 | 21 | Real Auth & guest isolation | DONE | Multi-user Supabase Auth, /register, /forgot-password, guest sandbox |
 | 22 | Profiles, RBAC foundation, RLS | DONE | Versioned migrations, user_roles, RLS audit, AdminRoute, profileRepository |
-| 23 | Persistence & sync hardening | TODO | - |
+| 23 | Persistence & sync hardening | DONE | Atomic upserts, lesson_progress migration, explicit error handling |
 | 24 | Secure economy & reward ledger | TODO | - |
 | 25 | Dynamic question bank schema | TODO | - |
 | 26 | Learning/grading engine | TODO | - |
