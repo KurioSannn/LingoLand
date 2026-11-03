@@ -1,3 +1,4 @@
+import { avatarOptions, defaultAvatar } from "../data/demoData";
 import { fetchUserRole } from "./profileRepository";
 import { supabase } from "./supabaseClient";
 import type { AvatarConfig, DemoState, DemoUser, MissionProgress, UserRole } from "../types";
@@ -12,6 +13,26 @@ export interface RemoteState {
   missionProgress: Record<string, MissionProgress>;
   claimedRewards: string[];
   completedLessonIds: string[];
+}
+
+const DEFAULT_OWNED_AVATAR_IDS = new Set(
+  avatarOptions.filter((opt) => opt.isOwnedByDefault).map((opt) => opt.id),
+);
+
+export function sanitizeAvatarForInventory(
+  avatar: AvatarConfig,
+  inventory: string[],
+): AvatarConfig {
+  const owned = new Set([...DEFAULT_OWNED_AVATAR_IDS, ...inventory]);
+  return {
+    skinToneId: owned.has(avatar.skinToneId) ? avatar.skinToneId : defaultAvatar.skinToneId,
+    hairId: owned.has(avatar.hairId) ? avatar.hairId : defaultAvatar.hairId,
+    topId: owned.has(avatar.topId) ? avatar.topId : defaultAvatar.topId,
+    bottomId: owned.has(avatar.bottomId) ? avatar.bottomId : defaultAvatar.bottomId,
+    shoesId: owned.has(avatar.shoesId) ? avatar.shoesId : defaultAvatar.shoesId,
+    accessoryId:
+      avatar.accessoryId && owned.has(avatar.accessoryId) ? avatar.accessoryId : null,
+  };
 }
 
 export async function fetchRemoteState(userId: string): Promise<RemoteState | null> {
@@ -57,14 +78,7 @@ export async function fetchRemoteState(userId: string): Promise<RemoteState | nu
           shoesId: avatarRes.data.shoes_id,
           accessoryId: avatarRes.data.accessory_id,
         }
-      : {
-          skinToneId: "skin-medium",
-          hairId: "hair-short-black",
-          topId: "top-hoodie-lavender",
-          bottomId: "bottom-dark-pants",
-          shoesId: "shoes-white",
-          accessoryId: null,
-        },
+      : { ...defaultAvatar },
     inventory: (inventoryRes.data ?? []).map((row) => row.item_id as string),
     missionProgress,
     claimedRewards: (rewardsRes.data ?? []).map((row) => row.mission_id as string),
@@ -72,16 +86,18 @@ export async function fetchRemoteState(userId: string): Promise<RemoteState | nu
   };
 }
 
-async function upsertRows(table: string, rows: Record<string, unknown>[], onConflict: string) {
-  if (!supabase || rows.length === 0) return;
-  const { error } = await supabase.from(table).upsert(rows, { onConflict });
-  if (error) {
-    throw new Error(`Gagal menyinkronkan data ke tabel ${table}: ${error.message}`);
-  }
-}
-
+/**
+ * Syncs ONLY user-editable profile metadata (name, username, display_name)
+ * and validated avatar configuration to Supabase.
+ *
+ * Server-authoritative progression and economy state (xp, coins, level,
+ * lesson_progress, claimed_rewards, inventory_items, mission_progress)
+ * are NEVER written from client state.
+ */
 export async function pushRemoteState(userId: string, state: DemoState): Promise<void> {
   if (!supabase) return;
+
+  const safeAvatar = sanitizeAvatarForInventory(state.avatar, state.inventory);
 
   const [profileRes, avatarRes] = await Promise.all([
     supabase.from("profiles").upsert({
@@ -89,21 +105,16 @@ export async function pushRemoteState(userId: string, state: DemoState): Promise
       name: state.user.name,
       username: state.user.username,
       display_name: state.user.displayName ?? state.user.name,
-      level: state.user.level,
-      xp: state.user.xp,
-      coins: state.user.coins,
-      hearts: state.user.hearts,
-      streak_days: state.user.streakDays,
       updated_at: new Date().toISOString(),
     }),
     supabase.from("avatar_configs").upsert({
       user_id: userId,
-      skin_tone_id: state.avatar.skinToneId,
-      hair_id: state.avatar.hairId,
-      top_id: state.avatar.topId,
-      bottom_id: state.avatar.bottomId,
-      shoes_id: state.avatar.shoesId,
-      accessory_id: state.avatar.accessoryId,
+      skin_tone_id: safeAvatar.skinToneId,
+      hair_id: safeAvatar.hairId,
+      top_id: safeAvatar.topId,
+      bottom_id: safeAvatar.bottomId,
+      shoes_id: safeAvatar.shoesId,
+      accessory_id: safeAvatar.accessoryId,
       updated_at: new Date().toISOString(),
     }),
   ]);
@@ -114,41 +125,6 @@ export async function pushRemoteState(userId: string, state: DemoState): Promise
   if (avatarRes.error) {
     throw new Error(`Gagal menyimpan avatar remote: ${avatarRes.error.message}`);
   }
-
-  await Promise.all([
-    upsertRows(
-      "inventory_items",
-      state.inventory.map((itemId) => ({ user_id: userId, item_id: itemId })),
-      "user_id,item_id",
-    ),
-    upsertRows(
-      "mission_progress",
-      Object.entries(state.missionProgress).map(([missionId, progress]) => ({
-        user_id: userId,
-        mission_id: missionId,
-        status: progress.status,
-        completed_objective_ids: progress.completedObjectiveIds,
-        updated_at: new Date().toISOString(),
-      })),
-      "user_id,mission_id",
-    ),
-    upsertRows(
-      "claimed_rewards",
-      state.claimedRewards.map((missionId) => ({ user_id: userId, mission_id: missionId })),
-      "user_id,mission_id",
-    ),
-    upsertRows(
-      "lesson_progress",
-      state.completedLessonIds.map((lessonUnitId) => ({
-        user_id: userId,
-        lesson_unit_id: lessonUnitId,
-        status: "completed",
-        score: 100,
-        updated_at: new Date().toISOString(),
-      })),
-      "user_id,lesson_unit_id",
-    ),
-  ]);
 }
 
 export interface HydratePayload {
@@ -162,9 +138,6 @@ export interface HydratePayload {
   completedLessonIds?: string[];
 }
 
-// Shared by both the explicit login flow (useDemoAuth) and the background
-// Supabase session listener (DemoContext), so a fetched-then-empty remote
-// vs. an existing remote resolve to the same HYDRATE_REMOTE shape once.
 export async function resolveHydratePayload(userId: string): Promise<HydratePayload> {
   const remote = await fetchRemoteState(userId);
   let authEmail = "";
@@ -205,12 +178,21 @@ export async function resolveHydratePayload(userId: string): Promise<HydratePayl
           streakDays: 1,
           role,
         },
+        avatar: { ...defaultAvatar },
+        inventory: Array.from(DEFAULT_OWNED_AVATAR_IDS),
+        missionProgress: {
+          intro: { completedObjectiveIds: [], status: "active" },
+          hobby: { completedObjectiveIds: [], status: "available" },
+          weekend: { completedObjectiveIds: [], status: "locked" },
+        },
+        completedMissionIds: [],
+        claimedRewards: [],
+        completedLessonIds: [],
       };
     }
     return { userId };
   }
 
-  // Self-heal legacy demo profile values if they were previously synced to remote
   const isLegacyDemoName =
     remote.user.name === "Raka Demo" ||
     remote.user.username === "raka.demo" ||
@@ -228,6 +210,10 @@ export async function resolveHydratePayload(userId: string): Promise<HydratePayl
     .filter(([, progress]) => progress.status === "completed")
     .map(([missionId]) => missionId);
 
+  const mergedInventory = Array.from(
+    new Set([...DEFAULT_OWNED_AVATAR_IDS, ...remote.inventory]),
+  );
+
   return {
     userId,
     user: {
@@ -236,8 +222,8 @@ export async function resolveHydratePayload(userId: string): Promise<HydratePayl
       username: resolvedUsername,
       ...(authEmail ? { email: authEmail } : {}),
     },
-    avatar: remote.avatar,
-    inventory: remote.inventory,
+    avatar: sanitizeAvatarForInventory(remote.avatar, mergedInventory),
+    inventory: mergedInventory,
     missionProgress: remote.missionProgress,
     completedMissionIds,
     claimedRewards: remote.claimedRewards,
@@ -245,20 +231,13 @@ export async function resolveHydratePayload(userId: string): Promise<HydratePayl
   };
 }
 
+/**
+ * Destructive client-side deletion of authoritative progression tables is disabled
+ * for authenticated accounts to preserve wallet ledger and idempotency integrity.
+ */
 export async function clearRemoteState(userId: string): Promise<void> {
-  if (!supabase) return;
-  const results = await Promise.all([
-    supabase.from("profiles").delete().eq("user_id", userId),
-    supabase.from("avatar_configs").delete().eq("user_id", userId),
-    supabase.from("inventory_items").delete().eq("user_id", userId),
-    supabase.from("mission_progress").delete().eq("user_id", userId),
-    supabase.from("claimed_rewards").delete().eq("user_id", userId),
-    supabase.from("lesson_progress").delete().eq("user_id", userId),
-  ]);
-
-  for (const res of results) {
-    if (res.error) {
-      throw new Error(`Gagal mereset remote state: ${res.error.message}`);
-    }
-  }
+  if (!userId) return;
+  throw new Error(
+    "Reset progres langsung dari klien dinonaktifkan untuk akun autentikasi demi menjaga integritas ledger server.",
+  );
 }

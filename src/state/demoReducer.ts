@@ -1,7 +1,7 @@
 import { createInitialState, defaultUser } from "../data/demoData";
 import { calculateLevel } from "../lib/game";
 import type { HydratePayload } from "../lib/supabaseSync";
-import type { AvatarConfig, DemoState, MissionProgress, MissionStatus } from "../types";
+import type { AvatarConfig, DemoState, LessonUnit, MissionProgress, MissionStatus } from "../types";
 
 export type DemoAction =
   | { type: "LOGIN_DEMO" }
@@ -9,6 +9,7 @@ export type DemoAction =
   | { type: "LOGOUT" }
   | { type: "RESET_PROGRESS" }
   | ({ type: "HYDRATE_REMOTE" } & HydratePayload)
+  | { type: "SET_CURRICULUM_UNITS"; units: LessonUnit[] }
   | { type: "SET_ACTIVE_MISSION"; missionId: string }
   | { type: "SAVE_AVATAR"; avatar: AvatarConfig }
   | { type: "BUY_ITEM"; itemId: string; price: number; itemName: string }
@@ -155,6 +156,11 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
         user: { ...state.user, coins, xp, level },
       };
     }
+    case "SET_CURRICULUM_UNITS":
+      return {
+        ...state,
+        curriculumUnits: action.units,
+      };
     case "ADD_ACTIVITY":
       return { ...state, recentActivity: recent(action.message, state.recentActivity) };
     case "HYDRATE_REMOTE":

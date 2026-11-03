@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Lock, RotateCcw, Sparkles, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Lock, RotateCcw, Sparkles, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Badge } from "../components/ui/Badge";
@@ -8,6 +8,8 @@ import { ProgressBar } from "../components/ui/ProgressBar";
 import { useDemoStorage } from "../hooks/useDemoStorage";
 import { fetchLessonById, submitLessonAttempt, type LessonGradeResult } from "../lib/learningRepository";
 import type { LessonUnit } from "../types";
+
+export type LessonSubmissionState = "idle" | "submitting" | "success" | "failed";
 
 function shuffle<T>(items: T[]): T[] {
   const array = [...items];
@@ -23,15 +25,24 @@ export function LessonPage() {
   const navigate = useNavigate();
   const { state, lessonUnitSummaries, completeLesson, setActiveMission } = useDemoStorage();
 
-  const summary = lessonUnitSummaries.find((entry) => entry.unit.id === unitId) ?? null;
+  const isGuest =
+    Boolean(state.isGuest) ||
+    !state.isAuthenticated ||
+    state.user.id === "demo-user" ||
+    state.user.id === "guest-user";
+
+  const summary =
+    lessonUnitSummaries.find(
+      (entry) => entry.unit.id === unitId || entry.unit.lessonId === unitId,
+    ) ?? null;
   const [remoteUnit, setRemoteUnit] = useState<LessonUnit | null>(null);
 
   useEffect(() => {
     if (!unitId) return;
     let cancelled = false;
-    fetchLessonById(unitId)
+    fetchLessonById(unitId, { isGuest })
       .then((loaded) => {
-        if (!cancelled && loaded && loaded.exercises.length > 0) {
+        if (!cancelled && loaded) {
           setRemoteUnit(loaded);
         }
       })
@@ -39,7 +50,7 @@ export function LessonPage() {
     return () => {
       cancelled = true;
     };
-  }, [unitId]);
+  }, [unitId, isGuest]);
 
   const activeUnit = remoteUnit ?? summary?.unit ?? null;
 
@@ -50,12 +61,16 @@ export function LessonPage() {
   const [initialWordBank, setInitialWordBank] = useState<string[]>([]);
   const [checked, setChecked] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
-  const [correctCount, setCorrectCount] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [gradeResult, setGradeResult] = useState<LessonGradeResult | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionState, setSubmissionState] = useState<LessonSubmissionState>("idle");
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [isFinished, setIsFinished] = useState(false);
-  const [wasAlreadyCompleted] = useState(() => summary?.status === "completed" || (unitId ? state.completedLessonIds.includes(unitId) : false));
+  const [wasAlreadyCompleted] = useState(
+    () =>
+      summary?.status === "completed" ||
+      (unitId ? state.completedLessonIds.includes(unitId) : false),
+  );
 
   const currentExercise = activeUnit?.exercises[exerciseIndex] ?? null;
 
@@ -68,6 +83,7 @@ export function LessonPage() {
     setInitialWordBank(bank);
     setChecked(false);
     setIsCorrect(false);
+    setSubmissionError(null);
   }, [currentExercise]);
 
   if (!activeUnit) {
@@ -75,7 +91,9 @@ export function LessonPage() {
       <section className="page-shell">
         <Card className="mx-auto max-w-md text-center">
           <p className="text-neutral-500">Lesson tidak ditemukan.</p>
-          <Button className="mt-4" onClick={() => navigate("/app/lessons")}>Kembali ke Learning Path</Button>
+          <Button className="mt-4" onClick={() => navigate("/app/lessons")}>
+            Kembali ke Learning Path
+          </Button>
         </Card>
       </section>
     );
@@ -87,8 +105,29 @@ export function LessonPage() {
         <Card className="mx-auto max-w-md text-center">
           <Lock className="mx-auto text-neutral-400" size={32} aria-hidden />
           <h1 className="mt-4 text-xl font-bold text-neutral-950">Lesson terkunci</h1>
-          <p className="mt-2 text-neutral-500">Selesaikan lesson sebelumnya dulu untuk membuka {activeUnit.title}.</p>
-          <Button className="mt-4" onClick={() => navigate("/app/lessons")}>Kembali ke Learning Path</Button>
+          <p className="mt-2 text-neutral-500">
+            Selesaikan lesson sebelumnya dulu untuk membuka {activeUnit.title}.
+          </p>
+          <Button className="mt-4" onClick={() => navigate("/app/lessons")}>
+            Kembali ke Learning Path
+          </Button>
+        </Card>
+      </section>
+    );
+  }
+
+  if (activeUnit.exercises.length === 0) {
+    return (
+      <section className="page-shell">
+        <Card className="mx-auto max-w-md text-center">
+          <AlertTriangle className="mx-auto text-amber-500" size={32} aria-hidden />
+          <h1 className="mt-4 text-xl font-bold text-neutral-950">Soal belum tersedia</h1>
+          <p className="mt-2 text-sm text-neutral-500">
+            Lesson <strong>{activeUnit.title}</strong> belum memiliki soal aktif yang dipublikasikan.
+          </p>
+          <Button className="mt-4" onClick={() => navigate("/app/lessons")}>
+            Kembali ke Learning Path
+          </Button>
         </Card>
       </section>
     );
@@ -97,14 +136,17 @@ export function LessonPage() {
   const unit = activeUnit;
   const totalExercises = unit.exercises.length;
   const isLastExercise = exerciseIndex === totalExercises - 1;
-  const canCheck = currentExercise?.type === "multiple-choice"
-    ? selectedOptionId !== null
-    : answerOrder.length > 0 && answerOrder.length === (currentExercise?.wordBank?.length ?? 0);
+  const isSubmitting = submissionState === "submitting";
+  const canCheck =
+    currentExercise?.type === "multiple-choice"
+      ? selectedOptionId !== null
+      : answerOrder.length > 0 && answerOrder.length === (currentExercise?.wordBank?.length ?? 0);
 
   const hasLocalAnswerKey = Boolean(
-    currentExercise?.type === "multiple-choice"
-      ? currentExercise.correctOptionId
-      : currentExercise?.correctOrder && currentExercise.correctOrder.length > 0,
+    isGuest &&
+      (currentExercise?.type === "multiple-choice"
+        ? currentExercise.correctOptionId
+        : currentExercise?.correctOrder && currentExercise.correctOrder.length > 0),
   );
 
   function selectOption(optionId: string) {
@@ -136,11 +178,11 @@ export function LessonPage() {
     setAnswers((prev) => ({ ...prev, [currentExercise.id]: userAns }));
 
     if (hasLocalAnswerKey) {
-      const correct = currentExercise.type === "multiple-choice"
-        ? selectedOptionId === currentExercise.correctOptionId
-        : JSON.stringify(answerOrder) === JSON.stringify(currentExercise.correctOrder);
+      const correct =
+        currentExercise.type === "multiple-choice"
+          ? selectedOptionId === currentExercise.correctOptionId
+          : JSON.stringify(answerOrder) === JSON.stringify(currentExercise.correctOrder);
       setIsCorrect(correct);
-      if (correct) setCorrectCount((count) => count + 1);
     } else {
       setIsCorrect(true);
     }
@@ -153,62 +195,61 @@ export function LessonPage() {
       return;
     }
 
-    setIsSubmitting(true);
-    const currentUserAns = currentExercise?.type === "multiple-choice" ? selectedOptionId! : answerOrder;
+    setSubmissionState("submitting");
+    setSubmissionError(null);
+
+    const currentUserAns =
+      currentExercise?.type === "multiple-choice" ? selectedOptionId! : answerOrder;
     const finalAnswers = { ...answers };
-    if (currentExercise) {
+    if (currentExercise && !(currentExercise.id in finalAnswers)) {
       finalAnswers[currentExercise.id] = currentUserAns;
     }
-
-    const isGuest =
-      state.isGuest ||
-      !state.isAuthenticated ||
-      state.user.id === "demo-user" ||
-      state.user.id === "guest-user";
+    setAnswers(finalAnswers);
 
     try {
+      const targetLessonOrUnitId = unit.lessonId ?? unit.id;
       const res = await submitLessonAttempt({
-        lessonUnitId: unit.id,
+        lessonUnitId: targetLessonOrUnitId,
         answers: finalAnswers,
         alreadyCompleted: wasAlreadyCompleted,
         isGuest,
       });
 
+      if (!res.ok) {
+        setSubmissionState("failed");
+        setSubmissionError(
+          res.message ||
+            "Jawaban belum berhasil diperiksa oleh server. Progres dan hadiah belum disimpan. Coba lagi.",
+        );
+        return;
+      }
+
       setGradeResult(res);
+      setSubmissionState("success");
       setIsFinished(true);
 
       if (res.passed) {
-        await completeLesson(unit.id, res.gainedXp, unit.title, res.score);
+        await completeLesson(unit.id, res.gainedXp, unit.title, res.score, {
+          currentXp: res.currentXp,
+          currentLevel: res.currentLevel,
+          alreadyRewarded: res.alreadyRewarded,
+        });
       }
     } catch {
-      const fallbackScore = Math.round((correctCount / totalExercises) * 100);
-      const passed = fallbackScore >= 70;
-      setGradeResult({
-        ok: true,
-        passed,
-        score: fallbackScore,
-        correctCount,
-        totalQuestions: totalExercises,
-        passThreshold: 70,
-        gainedXp: passed && !wasAlreadyCompleted ? 15 : 0,
-        alreadyRewarded: wasAlreadyCompleted,
-        message: passed ? "Selamat! Kamu lulus lesson ini." : "Kamu belum mencapai batas kelulusan minimum (70%). Silakan coba lagi!",
-        details: [],
-      });
-      setIsFinished(true);
-      if (passed) {
-        completeLesson(unit.id, passed && !wasAlreadyCompleted ? 15 : 0, unit.title, fallbackScore);
-      }
-    } finally {
-      setIsSubmitting(false);
+      // NEVER convert a server grading failure into a local pass or fake XP reward!
+      setSubmissionState("failed");
+      setSubmissionError(
+        "Jawaban belum berhasil diperiksa oleh server. Progres dan hadiah belum disimpan. Coba lagi.",
+      );
     }
   }
 
   function restartLesson() {
     setExerciseIndex(0);
-    setCorrectCount(0);
     setAnswers({});
     setGradeResult(null);
+    setSubmissionState("idle");
+    setSubmissionError(null);
     setIsFinished(false);
   }
 
@@ -219,9 +260,10 @@ export function LessonPage() {
     navigate("/app/world");
   }
 
-  if (isFinished) {
-    const passed = gradeResult?.passed ?? false;
-    const score = gradeResult?.score ?? Math.round((correctCount / totalExercises) * 100);
+  if (isFinished && gradeResult) {
+    const passed = gradeResult.passed;
+    const score = gradeResult.score;
+    const totalEvaluated = gradeResult.totalQuestions || totalExercises;
 
     return (
       <section className="page-shell">
@@ -235,17 +277,19 @@ export function LessonPage() {
             {passed ? "Lesson Lulus!" : "Belum Lulus"}
           </h1>
           <p className="mt-2 text-neutral-500">
-            {gradeResult?.correctCount ?? correctCount} dari {totalExercises} jawaban benar (Skor: {score}%).
+            {gradeResult.correctCount} dari {totalEvaluated} jawaban benar (Skor: {score}%).
           </p>
           <div className="mt-3 flex justify-center">
             {passed ? (
-              wasAlreadyCompleted ? (
+              wasAlreadyCompleted || gradeResult.alreadyRewarded ? (
                 <Badge tone="neutral">Latihan Ulang — tanpa reward tambahan</Badge>
               ) : (
-                <Badge tone="success">+{gradeResult?.gainedXp ?? unit.rewardXp} XP Diperoleh</Badge>
+                <Badge tone="success">+{gradeResult.gainedXp} XP Diperoleh</Badge>
               )
             ) : (
-              <Badge tone="warning">Batas minimum kelulusan: 70%</Badge>
+              <Badge tone="warning">
+                Batas minimum kelulusan: {gradeResult.passThreshold ?? 70}%
+              </Badge>
             )}
           </div>
           {!passed ? (
@@ -396,17 +440,37 @@ export function LessonPage() {
                   className="mt-4 flex items-start gap-2 rounded-md bg-primary-50 p-3 text-sm font-medium text-primary-700"
                 >
                   <CheckCircle2 size={18} className="mt-0.5 shrink-0" aria-hidden />
-                  <span>Jawaban disimpan. Evaluasi skor akhir dilakukan secara otomatis di akhir modul.</span>
+                  <span>Jawaban disimpan. Evaluasi skor akhir dilakukan secara otomatis oleh server di akhir modul.</span>
                 </div>
               )
             ) : null}
 
-            <div className="mt-6 flex justify-end">
+            {submissionState === "failed" && submissionError ? (
+              <div
+                role="alert"
+                className="mt-4 flex items-start gap-2 rounded-md border border-danger-500 bg-danger-100 p-3 text-sm font-medium text-red-800"
+              >
+                <AlertTriangle size={18} className="mt-0.5 shrink-0" aria-hidden />
+                <div className="flex-1">
+                  <p>{submissionError}</p>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex justify-end gap-2">
               {!checked ? (
-                <Button onClick={checkAnswer} disabled={!canCheck}>Periksa</Button>
+                <Button onClick={checkAnswer} disabled={!canCheck}>
+                  Periksa
+                </Button>
               ) : (
                 <Button onClick={goNext} disabled={isSubmitting}>
-                  {isSubmitting ? "Memeriksa..." : isLastExercise ? "Selesai" : "Lanjut"}
+                  {isSubmitting
+                    ? "Memeriksa di Server..."
+                    : submissionState === "failed"
+                      ? "Coba Kirim Lagi"
+                      : isLastExercise
+                        ? "Selesai"
+                        : "Lanjut"}
                 </Button>
               )}
             </div>

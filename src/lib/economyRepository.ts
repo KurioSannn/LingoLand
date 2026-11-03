@@ -1,3 +1,5 @@
+import { missions } from "../data/demoData";
+import { evaluateMissionInput } from "./game";
 import { isSupabaseConfigured, supabase } from "./supabaseClient";
 
 export interface ClaimMissionResult {
@@ -9,6 +11,16 @@ export interface ClaimMissionResult {
   coins?: number;
   xp?: number;
   level?: number;
+}
+
+export interface VerifyMissionObjectiveResult {
+  ok: boolean;
+  missionId: string;
+  completedObjectiveIds: string[];
+  totalObjectives: number;
+  allCompleted: boolean;
+  status: "locked" | "available" | "active" | "completed" | "incomplete";
+  message?: string;
 }
 
 export interface BuyStoreItemResult {
@@ -44,6 +56,13 @@ export interface ClaimMissionParams {
   isGuest?: boolean;
 }
 
+export interface VerifyMissionObjectiveParams {
+  missionId: string;
+  userInput: string;
+  currentCompletedIds?: string[];
+  isGuest?: boolean;
+}
+
 export interface BuyStoreItemParams {
   itemId: string;
   fallbackPrice: number;
@@ -59,6 +78,67 @@ export interface CompleteLessonParams {
   fallbackReward: { xp: number; title: string };
   alreadyCompleted: boolean;
   isGuest?: boolean;
+}
+
+export async function verifyMissionObjective(
+  params: VerifyMissionObjectiveParams,
+): Promise<VerifyMissionObjectiveResult> {
+  const { missionId, userInput, currentCompletedIds = [], isGuest } = params;
+
+  if (!isSupabaseConfigured || !supabase || isGuest) {
+    const mission = missions.find((m) => m.id === missionId);
+    if (!mission) {
+      return {
+        ok: false,
+        missionId,
+        completedObjectiveIds: currentCompletedIds,
+        totalObjectives: 0,
+        allCompleted: false,
+        status: "incomplete",
+        message: "Definisi misi tidak ditemukan.",
+      };
+    }
+
+    const nextIds = evaluateMissionInput(mission, userInput, currentCompletedIds);
+    const allCompleted = nextIds.length >= mission.objectives.length;
+    return {
+      ok: true,
+      missionId,
+      completedObjectiveIds: nextIds,
+      totalObjectives: mission.objectives.length,
+      allCompleted,
+      status: allCompleted ? "completed" : "active",
+    };
+  }
+
+  const { data, error } = await supabase.rpc("verify_mission_objective_atomic", {
+    p_mission_id: missionId,
+    p_user_input: userInput,
+  });
+
+  if (error) {
+    throw new Error(`Gagal memverifikasi objektif misi di server: ${error.message}`);
+  }
+
+  const res = data as {
+    ok: boolean;
+    mission_id?: string;
+    completed_objective_ids?: string[];
+    total_objectives?: number;
+    all_completed?: boolean;
+    status?: "locked" | "available" | "active" | "completed" | "incomplete";
+    message?: string;
+  };
+
+  return {
+    ok: res.ok,
+    missionId: res.mission_id ?? missionId,
+    completedObjectiveIds: res.completed_objective_ids ?? currentCompletedIds,
+    totalObjectives: res.total_objectives ?? 0,
+    allCompleted: Boolean(res.all_completed),
+    status: res.status ?? "active",
+    message: res.message,
+  };
 }
 
 export async function claimMissionReward(params: ClaimMissionParams): Promise<ClaimMissionResult> {
@@ -146,8 +226,13 @@ export async function buyStoreItem(params: BuyStoreItemParams): Promise<BuyStore
   };
 }
 
+/**
+ * Guest-only local lesson completion helper.
+ * Authenticated users MUST complete and grade lessons exclusively via
+ * `submitLessonAttempt` (`grade_lesson_attempt_atomic`).
+ */
 export async function completeLessonReward(params: CompleteLessonParams): Promise<CompleteLessonResult> {
-  const { lessonUnitId, score = 100, fallbackReward, alreadyCompleted, isGuest } = params;
+  const { fallbackReward, alreadyCompleted, isGuest } = params;
 
   if (!isSupabaseConfigured || !supabase || isGuest) {
     if (alreadyCompleted) {
@@ -165,32 +250,9 @@ export async function completeLessonReward(params: CompleteLessonParams): Promis
     };
   }
 
-  const { data, error } = await supabase.rpc("complete_lesson_atomic", {
-    p_lesson_unit_id: lessonUnitId,
-    p_score: score,
-  });
-
-  if (error) {
-    throw new Error(`Gagal mencatat penyelesaian lesson: ${error.message}`);
-  }
-
-  const res = data as {
-    ok: boolean;
-    message: string;
-    already_rewarded?: boolean;
-    gained_xp?: number;
-    xp?: number;
-    level?: number;
-  };
-
-  return {
-    ok: res.ok,
-    message: res.message,
-    alreadyRewarded: res.already_rewarded,
-    gainedXp: res.gained_xp,
-    xp: res.xp,
-    level: res.level,
-  };
+  throw new Error(
+    "Akses ditolak: Penyelesaian lesson akun autentikasi wajib melalui evaluasi server (grade_lesson_attempt_atomic).",
+  );
 }
 
 export async function fetchWalletTransactions(userId: string): Promise<WalletTransactionRecord[]> {

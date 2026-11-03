@@ -1,7 +1,9 @@
 import { CheckCircle2, Hourglass, Lock, Play, Unlock } from "lucide-react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "../components/ui/Badge";
 import { useDemoStorage } from "../hooks/useDemoStorage";
+import { fetchCurriculumUnits } from "../lib/learningRepository";
 import type { LearningPathItemSummary } from "../state/selectors";
 
 const pathMeta = {
@@ -50,17 +52,31 @@ function pathItemHint(item: LearningPathItemSummary): string {
   return "Klik untuk mulai bab ini.";
 }
 
-// This page is a self-contained exercise track (multiple choice / word-order
-// drills), separate from Mission/World speaking practice at /app/learn and
-// /app/world. It does not gate, and is not gated by, mission or NPC progress —
-// only the topic ties a lesson unit to its matching mission.
 export function LessonsPage() {
   const navigate = useNavigate();
-  const { learningPath } = useDemoStorage();
+  const { state, learningPath, setCurriculumUnits } = useDemoStorage();
 
-  // Every step is numbered as a chapter except the onboarding baseline — new
-  // chapters (including "coming soon" ones) keep the numbering continuous so
-  // the course visibly grows over time instead of resetting.
+  const isGuest =
+    Boolean(state.isGuest) ||
+    !state.isAuthenticated ||
+    state.user.id === "demo-user" ||
+    state.user.id === "guest-user";
+
+  useEffect(() => {
+    if (isGuest) return;
+    let cancelled = false;
+    fetchCurriculumUnits({ isGuest: false })
+      .then((units) => {
+        if (!cancelled && units.length > 0) {
+          setCurriculumUnits(units);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isGuest, setCurriculumUnits]);
+
   let chapterCounter = 0;
   const items = learningPath.map((item) => {
     const isChapter = item.id !== "basic";

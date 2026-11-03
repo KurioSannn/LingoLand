@@ -144,10 +144,13 @@ export interface LessonExercise {
 
 export interface LessonUnit {
   id: string;
+  lessonId?: string;
   title: string;
   description: string;
   relatedMissionId: string;
   rewardXp: number;
+  passThreshold?: number;
+  unlockPolicy?: "always_unlocked" | "previous_completed" | "admin_only";
   exercises: LessonExercise[];
 }
 
@@ -170,6 +173,7 @@ export interface DemoState {
   completedMissionIds: string[];
   claimedRewards: string[];
   completedLessonIds: string[];
+  curriculumUnits?: LessonUnit[];
   recentActivity: string[];
 }
 

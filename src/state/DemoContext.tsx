@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { Dispatch, ReactNode } from "react";
 import { STORAGE_KEY } from "../data/demoData";
+import { fetchCurriculumUnits } from "../lib/learningRepository";
 import { loadDemoState, saveDemoState } from "../lib/storage";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 import { pushRemoteState, resolveHydratePayload } from "../lib/supabaseSync";
@@ -18,8 +19,6 @@ interface DemoContextValue {
 
 const DemoContext = createContext<DemoContextValue | null>(null);
 
-// The local default id means the session was never hydrated from Supabase
-// (either not configured, or user is logged in via the offline fallback path).
 function isRemoteBacked(state: DemoState) {
   return (
     isSupabaseConfigured &&
@@ -40,18 +39,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     setStorageMeta(saveDemoState(state));
   }, [state]);
 
-  // Serialize Supabase pushes: `pushRemoteState` deletes-then-inserts several
-  // tables, so two overlapping calls could interleave and let a stale write
-  // land after a fresher one. Only one push runs at a time; extra state
-  // changes that arrive mid-push are coalesced into a single trailing push
-  // of whatever the latest state is once the in-flight one finishes.
   const latestStateRef = useRef(state);
   latestStateRef.current = state;
   const syncRef = useRef({ inFlight: false, dirty: false });
 
-  // Keep auth in sync with the real Supabase session instead of trusting the
-  // localStorage mirror alone: a stale mirror (expired token, signed out from
-  // another tab) would otherwise keep the app "logged in" until a write fails.
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
 
@@ -89,6 +80,23 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Load dynamic curriculum units from Supabase for authenticated users
+  useEffect(() => {
+    if (!isRemoteBacked(state)) return;
+    let cancelled = false;
+    fetchCurriculumUnits({ isGuest: false })
+      .then((units) => {
+        if (!cancelled && units.length > 0) {
+          dispatch({ type: "SET_CURRICULUM_UNITS", units });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [state.isAuthenticated, state.isGuest, state.user.id]);
+
+  // Sync only user-editable profile metadata and validated avatar config
   useEffect(() => {
     if (!isRemoteBacked(state)) return;
     runRemoteSync(state.user.id);
@@ -115,7 +123,15 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           }
         });
     }
-  }, [state]);
+  }, [
+    state.isAuthenticated,
+    state.isGuest,
+    state.user.id,
+    state.user.name,
+    state.user.username,
+    state.user.displayName,
+    state.avatar,
+  ]);
 
   const loginError = useMemo(() => (state.isAuthenticated ? null : "Email atau password tidak sesuai."), [state.isAuthenticated]);
 

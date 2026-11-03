@@ -8,7 +8,7 @@ import {
   updatePassword,
 } from "../lib/supabaseAuth";
 import { isSupabaseConfigured } from "../lib/supabaseClient";
-import { clearRemoteState, resolveHydratePayload } from "../lib/supabaseSync";
+import { resolveHydratePayload } from "../lib/supabaseSync";
 import { useDemo } from "../state/DemoContext";
 
 export interface LoginResult {
@@ -114,13 +114,15 @@ export function useDemoAuth() {
         ? state.user.id
         : null;
 
+    if (remoteUserId) {
+      // Authenticated accounts use server-authoritative progression and ledger;
+      // re-hydrate authoritative state from Supabase rather than wiping remote tables.
+      await hydrateFromRemote(remoteUserId);
+      return;
+    }
+
     clearDemoState();
     dispatch({ type: "RESET_PROGRESS" });
-
-    if (remoteUserId) {
-      await clearRemoteState(remoteUserId).catch(() => {});
-      dispatch({ type: "HYDRATE_REMOTE", userId: remoteUserId });
-    }
   }
 
   return {

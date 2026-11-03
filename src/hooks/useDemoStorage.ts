@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { buyStoreItem, claimMissionReward, completeLessonReward } from "../lib/economyRepository";
+import { isSupabaseConfigured } from "../lib/supabaseClient";
 import { useDemo } from "../state/DemoContext";
 import {
   selectActiveMissionSummary,
@@ -10,12 +11,14 @@ import {
   selectStateSnapshot,
   selectStoreItemSummaries,
 } from "../state/selectors";
-import type { AvatarConfig } from "../types";
+import type { AvatarConfig, LessonUnit } from "../types";
 
-// Resetting progress touches Supabase (clear remote rows, re-seed the still-active
-// session) — that lives solely in useDemoAuth.resetProgress so there is one path,
-// not two reset implementations that could drift (the old copy here only ever
-// cleared localStorage and never synced the Supabase side).
+export interface AuthoritativeLessonSync {
+  currentXp?: number;
+  currentLevel?: number;
+  alreadyRewarded?: boolean;
+}
+
 export function useDemoStorage() {
   const { state, dispatch, storageMeta } = useDemo();
 
@@ -34,6 +37,7 @@ export function useDemoStorage() {
     storageMeta,
     ...selectors,
     setActiveMission: (missionId: string) => dispatch({ type: "SET_ACTIVE_MISSION", missionId }),
+    setCurriculumUnits: (units: LessonUnit[]) => dispatch({ type: "SET_CURRICULUM_UNITS", units }),
     saveAvatar: (avatar: AvatarConfig) => dispatch({ type: "SAVE_AVATAR", avatar }),
     buyItem: async (itemId: string, price: number, itemName: string) => {
       const isGuest =
@@ -60,19 +64,56 @@ export function useDemoStorage() {
       return res;
     },
     addActivity: (message: string) => dispatch({ type: "ADD_ACTIVITY", message }),
-    completeLesson: async (lessonUnitId: string, xp: number, lessonTitle: string, score: number = 100) => {
+    completeLesson: async (
+      lessonUnitId: string,
+      xp: number,
+      lessonTitle: string,
+      score: number = 100,
+      authoritative?: AuthoritativeLessonSync,
+    ) => {
       const isGuest =
         state.isGuest ||
         !state.isAuthenticated ||
         state.user.id === "demo-user" ||
         state.user.id === "guest-user";
 
+      // Authenticated users have already been graded and rewarded atomically on the server
+      // via `grade_lesson_attempt_atomic` (`submitLessonAttempt`). Never invoke a second
+      // reward RPC from the client.
+      if (!isGuest && isSupabaseConfigured) {
+        const effectiveXp = authoritative?.alreadyRewarded ? 0 : xp;
+        dispatch({
+          type: "COMPLETE_LESSON",
+          lessonUnitId,
+          xp: effectiveXp,
+          lessonTitle,
+        });
+        if (authoritative?.currentXp !== undefined) {
+          dispatch({
+            type: "SET_WALLET_BALANCES",
+            xp: authoritative.currentXp,
+            level: authoritative.currentLevel,
+          });
+        }
+        return {
+          ok: true,
+          message: authoritative?.alreadyRewarded
+            ? "Latihan ulang berhasil diselesaikan."
+            : `Lesson ${lessonTitle} selesai!`,
+          alreadyRewarded: authoritative?.alreadyRewarded ?? false,
+          gainedXp: effectiveXp,
+          xp: authoritative?.currentXp,
+          level: authoritative?.currentLevel,
+        };
+      }
+
+      // Guest / offline mode local completion
       const res = await completeLessonReward({
         lessonUnitId,
         score,
         fallbackReward: { xp, title: lessonTitle },
         alreadyCompleted: state.completedLessonIds.includes(lessonUnitId),
-        isGuest,
+        isGuest: true,
       });
 
       if (res.ok) {
