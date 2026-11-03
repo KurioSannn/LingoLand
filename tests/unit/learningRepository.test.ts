@@ -3,12 +3,14 @@ import {
   fetchCurriculumUnits,
   fetchLessonById,
   fetchPublishedCourses,
+  submitLessonAttempt,
 } from "../../src/lib/learningRepository";
 import { supabase } from "../../src/lib/supabaseClient";
 
 vi.mock("../../src/lib/supabaseClient", () => ({
   supabase: {
     from: vi.fn(),
+    rpc: vi.fn(),
   },
   isSupabaseConfigured: true,
 }));
@@ -160,6 +162,102 @@ describe("learningRepository", () => {
 
       const result = await fetchLessonById("non-existent-lesson");
       expect(result).toBeNull();
+    });
+  });
+
+  describe("submitLessonAttempt", () => {
+    it("evaluates answers locally in guest mode and passes when score >= 70%", async () => {
+      const res = await submitLessonAttempt({
+        lessonUnitId: "lesson-intro",
+        answers: {
+          "intro-mc-1": "a",
+          "intro-mc-2": "b",
+          "intro-wo-1": ["I", "like", "playing", "games"],
+        },
+        isGuest: true,
+      });
+
+      expect(res.ok).toBe(true);
+      expect(res.passed).toBe(true);
+      expect(res.score).toBe(100);
+      expect(res.correctCount).toBe(3);
+      expect(res.gainedXp).toBe(15);
+      expect(supabase!.rpc).not.toHaveBeenCalled();
+    });
+
+    it("evaluates answers locally in guest mode and fails when score < 70%", async () => {
+      const res = await submitLessonAttempt({
+        lessonUnitId: "lesson-intro",
+        answers: {
+          "intro-mc-1": "c", // Wrong
+          "intro-mc-2": "c", // Wrong
+          "intro-wo-1": ["games", "playing"], // Wrong
+        },
+        isGuest: true,
+      });
+
+      expect(res.ok).toBe(true);
+      expect(res.passed).toBe(false);
+      expect(res.score).toBe(0);
+      expect(res.gainedXp).toBe(0);
+      expect(supabase!.rpc).not.toHaveBeenCalled();
+    });
+
+    it("returns zero extra XP on repeated pass in guest mode", async () => {
+      const res = await submitLessonAttempt({
+        lessonUnitId: "lesson-intro",
+        answers: {
+          "intro-mc-1": "a",
+          "intro-mc-2": "b",
+          "intro-wo-1": ["I", "like", "playing", "games"],
+        },
+        alreadyCompleted: true,
+        isGuest: true,
+      });
+
+      expect(res.ok).toBe(true);
+      expect(res.passed).toBe(true);
+      expect(res.alreadyRewarded).toBe(true);
+      expect(res.gainedXp).toBe(0);
+    });
+
+    it("invokes grade_lesson_attempt_atomic RPC for remote registered user", async () => {
+      vi.mocked(supabase!.rpc).mockResolvedValueOnce({
+        data: {
+          ok: true,
+          passed: true,
+          score: 100,
+          correct_count: 3,
+          total_questions: 3,
+          pass_threshold: 70,
+          gained_xp: 15,
+          already_rewarded: false,
+          message: "Selamat! Kamu lulus lesson ini.",
+          details: [],
+        },
+        error: null,
+      } as unknown as ReturnType<NonNullable<typeof supabase>["rpc"]>);
+
+      const res = await submitLessonAttempt({
+        lessonUnitId: "lesson-intro",
+        answers: {
+          "intro-mc-1": "a",
+          "intro-mc-2": "b",
+        },
+        isGuest: false,
+      });
+
+      expect(supabase!.rpc).toHaveBeenCalledWith("grade_lesson_attempt_atomic", {
+        p_lesson_unit_id: "lesson-intro",
+        p_answers: {
+          "intro-mc-1": "a",
+          "intro-mc-2": "b",
+        },
+      });
+      expect(res.ok).toBe(true);
+      expect(res.passed).toBe(true);
+      expect(res.score).toBe(100);
+      expect(res.gainedXp).toBe(15);
     });
   });
 });

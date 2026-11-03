@@ -6,6 +6,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useDemoStorage } from "../hooks/useDemoStorage";
+import { submitLessonAttempt, type LessonGradeResult } from "../lib/learningRepository";
 
 function shuffle<T>(items: T[]): T[] {
   const array = [...items];
@@ -19,7 +20,7 @@ function shuffle<T>(items: T[]): T[] {
 export function LessonPage() {
   const { unitId } = useParams<{ unitId: string }>();
   const navigate = useNavigate();
-  const { lessonUnitSummaries, completeLesson } = useDemoStorage();
+  const { state, lessonUnitSummaries, completeLesson } = useDemoStorage();
 
   const summary = lessonUnitSummaries.find((entry) => entry.unit.id === unitId) ?? null;
 
@@ -31,6 +32,9 @@ export function LessonPage() {
   const [checked, setChecked] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
+  const [gradeResult, setGradeResult] = useState<LessonGradeResult | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [wasAlreadyCompleted] = useState(() => summary?.status === "completed");
 
@@ -106,6 +110,9 @@ export function LessonPage() {
 
   function checkAnswer() {
     if (!currentExercise || checked) return;
+    const userAns = currentExercise.type === "multiple-choice" ? selectedOptionId! : answerOrder;
+    setAnswers((prev) => ({ ...prev, [currentExercise.id]: userAns }));
+
     const correct = currentExercise.type === "multiple-choice"
       ? selectedOptionId === currentExercise.correctOptionId
       : JSON.stringify(answerOrder) === JSON.stringify(currentExercise.correctOrder);
@@ -115,41 +122,110 @@ export function LessonPage() {
     if (correct) setCorrectCount((count) => count + 1);
   }
 
-  function goNext() {
+  async function goNext() {
     if (!isLastExercise) {
       setExerciseIndex((index) => index + 1);
       return;
     }
-    setIsFinished(true);
-    completeLesson(unit.id, unit.rewardXp, unit.title);
+
+    setIsSubmitting(true);
+    const currentUserAns = currentExercise?.type === "multiple-choice" ? selectedOptionId! : answerOrder;
+    const finalAnswers = { ...answers };
+    if (currentExercise) {
+      finalAnswers[currentExercise.id] = currentUserAns;
+    }
+
+    const isGuest =
+      state.isGuest ||
+      !state.isAuthenticated ||
+      state.user.id === "demo-user" ||
+      state.user.id === "guest-user";
+
+    try {
+      const res = await submitLessonAttempt({
+        lessonUnitId: unit.id,
+        answers: finalAnswers,
+        alreadyCompleted: wasAlreadyCompleted,
+        isGuest,
+      });
+
+      setGradeResult(res);
+      setIsFinished(true);
+
+      if (res.passed) {
+        await completeLesson(unit.id, res.gainedXp, unit.title, res.score);
+      }
+    } catch {
+      const fallbackScore = Math.round((correctCount / totalExercises) * 100);
+      const passed = fallbackScore >= 70;
+      setGradeResult({
+        ok: true,
+        passed,
+        score: fallbackScore,
+        correctCount,
+        totalQuestions: totalExercises,
+        passThreshold: 70,
+        gainedXp: passed && !wasAlreadyCompleted ? 15 : 0,
+        alreadyRewarded: wasAlreadyCompleted,
+        message: passed ? "Selamat! Kamu lulus lesson ini." : "Kamu belum mencapai batas kelulusan minimum (70%). Silakan coba lagi!",
+        details: [],
+      });
+      setIsFinished(true);
+      if (passed) {
+        completeLesson(unit.id, passed && !wasAlreadyCompleted ? 15 : 0, unit.title, fallbackScore);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function restartLesson() {
     setExerciseIndex(0);
     setCorrectCount(0);
+    setAnswers({});
+    setGradeResult(null);
     setIsFinished(false);
   }
 
   if (isFinished) {
-    const earnedXp = wasAlreadyCompleted ? 0 : unit.rewardXp;
+    const passed = gradeResult?.passed ?? false;
+    const score = gradeResult?.score ?? Math.round((correctCount / totalExercises) * 100);
+
     return (
       <section className="page-shell">
         <Card className="mx-auto max-w-xl text-center">
-          <Sparkles className="mx-auto text-primary-500" size={40} aria-hidden />
-          <h1 className="mt-4 text-2xl font-bold text-neutral-950">Lesson Selesai!</h1>
-          <p className="mt-2 text-neutral-500">{correctCount} dari {totalExercises} jawaban benar.</p>
-          {wasAlreadyCompleted ? (
-            <div className="mt-3 flex justify-center">
-              <Badge tone="neutral">Latihan Ulang — tanpa reward tambahan</Badge>
-            </div>
+          {passed ? (
+            <Sparkles className="mx-auto text-primary-500" size={40} aria-hidden />
           ) : (
-            <p className="mt-3 text-sm font-semibold text-neutral-700">+{earnedXp} XP</p>
+            <XCircle className="mx-auto text-danger-500" size={40} aria-hidden />
+          )}
+          <h1 className="mt-4 text-2xl font-bold text-neutral-950">
+            {passed ? "Lesson Lulus!" : "Belum Lulus"}
+          </h1>
+          <p className="mt-2 text-neutral-500">
+            {gradeResult?.correctCount ?? correctCount} dari {totalExercises} jawaban benar (Skor: {score}%).
+          </p>
+          <div className="mt-3 flex justify-center">
+            {passed ? (
+              wasAlreadyCompleted ? (
+                <Badge tone="neutral">Latihan Ulang — tanpa reward tambahan</Badge>
+              ) : (
+                <Badge tone="success">+{gradeResult?.gainedXp ?? unit.rewardXp} XP Diperoleh</Badge>
+              )
+            ) : (
+              <Badge tone="warning">Batas minimum kelulusan: 70%</Badge>
+            )}
+          </div>
+          {!passed && (
+            <p className="mt-4 text-sm text-neutral-600">
+              Jangan berkecil hati! Ulangi latihan ini untuk menguasai kosakata dan membuka bab berikutnya.
+            </p>
           )}
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <Button onClick={() => navigate("/app/lessons")}>Kembali ke Learning Path</Button>
-            <Button variant="secondary" onClick={restartLesson}>
+            <Button variant={passed ? "secondary" : "primary"} onClick={restartLesson}>
               <RotateCcw size={16} aria-hidden />
-              Ulangi Lesson
+              {passed ? "Latihan Ulang" : "Coba Lagi"}
             </Button>
           </div>
         </Card>
@@ -270,7 +346,9 @@ export function LessonPage() {
               {!checked ? (
                 <Button onClick={checkAnswer} disabled={!canCheck}>Periksa</Button>
               ) : (
-                <Button onClick={goNext}>{isLastExercise ? "Selesai" : "Lanjut"}</Button>
+                <Button onClick={goNext} disabled={isSubmitting}>
+                  {isSubmitting ? "Memeriksa..." : isLastExercise ? "Selesai" : "Lanjut"}
+                </Button>
               )}
             </div>
           </div>

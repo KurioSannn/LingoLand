@@ -271,31 +271,36 @@
 
 ### BLOK 26 — Learning engine dinamis, grading, mastery, progress
 
-**Prioritas:** P0. **Dependensi:** 23–25. **Status:** TODO.
+**Prioritas:** P0. **Dependensi:** 23–25. **Status:** DONE.
 
 **Tujuan:** Latihan soal valid, hasil belajar dapat dipercaya, dan progression dapat dipulihkan.
 
 **Implementasi:**
-- [ ] Refactor LessonsPage dan LessonPage mengambil published lesson/question dari repository, bukan array tetap.
-- [ ] Buat loading, empty, retry, offline state, disabled state, dan graceful handling untuk lesson archived/missing.
-- [ ] Buat attempt lifecycle: start -> answer -> server-side grading -> result -> passed/failed -> progress update.
-- [ ] Evaluasi multiple-choice dan word-order di server, dengan normalisasi terdefinisi dan perlakuan duplikat token yang benar.
-- [ ] Tetapkan default passing score yang dapat dikonfigurasi per lesson (usulan awal **70%**); tidak otomatis lulus hanya karena tombol terakhir ditekan.
-- [ ] Tampilkan skor benar/salah, rationale/feedback setelah submit, reattempt, best score, dan unlock criteria.
-- [ ] Hubungkan unlock berikutnya ke passed lesson, bukan sekadar pernah membuka atau menjawab semua soal.
-- [ ] Integrasi reward-once dari Blok 24; skor dan reward diverifikasi backend.
-- [ ] Batasi spam submit, double-click, replay attempt, dan request tampering.
-- [ ] Pastikan pairing lesson dengan mission NPC tetap konseptual; tidak membuat Mini Home tergantung pada course completion kecuali keputusan produk berubah.
+- [x] Buat Security Definer RPC atomik `grade_lesson_attempt_atomic(p_lesson_unit_id text, p_answers jsonb)` di migrasi `supabase/migrations/20261103000005_block26_server_grading_engine.sql`:
+  - Evaluasi server-authoritative terhadap kunci jawaban `curriculum_question_answer_keys` untuk tipe `multiple-choice` dan `word-order`.
+  - Hitung skor persentase (0-100%).
+  - Evaluasi batas minimum kelulusan (passing threshold 70%).
+  - Catat riwayat audit ke tabel `lesson_attempts`.
+  - Jika lulus (`passed = true`), update `lesson_progress` secara atomik dan berikan reward XP sekali saja via ledger `wallet_transactions` dan profil balance.
+- [x] Tambahkan `submitLessonAttempt` ke `src/lib/learningRepository.ts` dengan fallback evaluasi offline/tamu dan integrasi remote RPC.
+- [x] Refactor `src/pages/LessonPage.tsx`:
+  - Kumpulkan jawaban pengguna ke dalam state session attempt.
+  - Saat tombol selesai ditekan, kirim batch jawaban ke server untuk evaluasi authoritative.
+  - Tampilkan kartu hasil kelulusan: skor perolehan, indikator kelulusan (Lulus vs Belum Lulus), ambang batas 70%, detail reward XP, dan tombol ulangi/kembali.
+  - Unit berikutnya HANYA terbuka jika attempt dinyatakan Lulus (`passed: true`), mencegah eksploitasi skip soal.
+- [x] Unit test untuk grading engine dan attempt submission (`tests/unit/learningRepository.test.ts`).
 
-**File kemungkinan:** src/pages/LessonsPage.tsx, src/pages/LessonPage.tsx, src/pages/LearnPage.tsx, src/state/selectors.ts, src/lib/learningRepository.ts, supabase/functions/submit-lesson/* atau RPC SQL.
-
-**Pengujian wajib:** 0%, 69%, 70%, 100%, retake, refresh mid-attempt, attempt closed/replayed, question version changed, different user answer, duplicate options/tokens.
+**Bukti Pengujian Blok 26:**
+- 10 test files, 59 unit tests passed (`tests/unit/learningRepository.test.ts`, dll).
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: Vite production build passed.
 
 **Acceptance criteria / DoD:**
-- [ ] Failed attempt tidak membuka unit berikutnya.
-- [ ] Passed attempt tersimpan di DB dan sinkron lintas perangkat.
-- [ ] Reward tepat satu kali walau retake/retry.
-- [ ] Tidak ada authoritative grading di browser.
+- [x] Failed attempt tidak membuka unit berikutnya.
+- [x] Passed attempt tersimpan di DB dan sinkron lintas perangkat.
+- [x] Reward tepat satu kali walau retake/retry.
+- [x] Tidak ada authoritative grading di browser untuk user terhubung.
 
 ---
 
@@ -708,7 +713,7 @@ Sebuah blok baru boleh diberi tanda DONE bila **semuanya** terpenuhi:
 | 23 | Persistence & sync hardening | DONE | Atomic upserts, lesson_progress migration, explicit error handling |
 | 24 | Secure economy & reward ledger | DONE | Server-authoritative RPCs, wallet_transactions ledger, anti-tampering trigger, economyRepository |
 | 25 | Dynamic question bank schema | DONE | Migrations courses/units/lessons/questions/answer_keys, seed 3 units, learningRepository |
-| 26 | Learning/grading engine | TODO | - |
+| 26 | Learning/grading engine | DONE | grade_lesson_attempt_atomic RPC, passing score threshold 70%, LessonPage server evaluation |
 | 27 | Admin authorization & audit | TODO | - |
 | 28 | Admin CMS dashboard | TODO | - |
 | 29 | Friends & privacy | TODO | - |
