@@ -72,7 +72,7 @@ export function StorePage() {
     setMessage("");
   }
 
-  function handlePurchase() {
+  async function handlePurchase() {
     if (isOwned) {
       setPurchaseStatus("error");
       setMessage(`${selectedItem.name} sudah dimiliki.`);
@@ -85,9 +85,19 @@ export function StorePage() {
       return;
     }
 
-    buyItem(selectedItem.id, selectedItem.price, selectedItem.name);
-    setPurchaseStatus("success");
-    setMessage(`${selectedItem.name} berhasil ditambahkan ke inventory.`);
+    try {
+      const res = await buyItem(selectedItem.id, selectedItem.price, selectedItem.name);
+      if (res && !res.ok) {
+        setPurchaseStatus("error");
+        setMessage(res.message);
+        return;
+      }
+      setPurchaseStatus("success");
+      setMessage(`${selectedItem.name} berhasil ditambahkan ke inventory.`);
+    } catch (err) {
+      setPurchaseStatus("error");
+      setMessage(err instanceof Error ? err.message : "Terjadi kesalahan saat memproses pembelian.");
+    }
   }
 
   return (

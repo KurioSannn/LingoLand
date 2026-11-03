@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { buyStoreItem, claimMissionReward, completeLessonReward } from "../lib/economyRepository";
 import { useDemo } from "../state/DemoContext";
 import {
   selectActiveMissionSummary,
@@ -34,9 +35,74 @@ export function useDemoStorage() {
     ...selectors,
     setActiveMission: (missionId: string) => dispatch({ type: "SET_ACTIVE_MISSION", missionId }),
     saveAvatar: (avatar: AvatarConfig) => dispatch({ type: "SAVE_AVATAR", avatar }),
-    buyItem: (itemId: string, price: number, itemName: string) => dispatch({ type: "BUY_ITEM", itemId, price, itemName }),
+    buyItem: async (itemId: string, price: number, itemName: string) => {
+      const isGuest =
+        state.isGuest ||
+        !state.isAuthenticated ||
+        state.user.id === "demo-user" ||
+        state.user.id === "guest-user";
+
+      const res = await buyStoreItem({
+        itemId,
+        fallbackPrice: price,
+        fallbackName: itemName,
+        currentCoins: state.user.coins,
+        alreadyOwned: state.inventory.includes(itemId),
+        isGuest,
+      });
+
+      if (res.ok) {
+        dispatch({ type: "BUY_ITEM", itemId, price, itemName });
+        if (res.coins !== undefined) {
+          dispatch({ type: "SET_WALLET_BALANCES", coins: res.coins });
+        }
+      }
+      return res;
+    },
     addActivity: (message: string) => dispatch({ type: "ADD_ACTIVITY", message }),
-    completeLesson: (lessonUnitId: string, xp: number, lessonTitle: string) =>
-      dispatch({ type: "COMPLETE_LESSON", lessonUnitId, xp, lessonTitle }),
+    completeLesson: async (lessonUnitId: string, xp: number, lessonTitle: string, score: number = 100) => {
+      const isGuest =
+        state.isGuest ||
+        !state.isAuthenticated ||
+        state.user.id === "demo-user" ||
+        state.user.id === "guest-user";
+
+      const res = await completeLessonReward({
+        lessonUnitId,
+        score,
+        fallbackReward: { xp, title: lessonTitle },
+        alreadyCompleted: state.completedLessonIds.includes(lessonUnitId),
+        isGuest,
+      });
+
+      if (res.ok) {
+        dispatch({ type: "COMPLETE_LESSON", lessonUnitId, xp: res.gainedXp ?? xp, lessonTitle });
+        if (res.xp !== undefined && res.level !== undefined) {
+          dispatch({ type: "SET_WALLET_BALANCES", xp: res.xp, level: res.level });
+        }
+      }
+      return res;
+    },
+    claimReward: async (missionId: string, xp: number, coins: number, missionTitle: string) => {
+      const isGuest =
+        state.isGuest ||
+        !state.isAuthenticated ||
+        state.user.id === "demo-user" ||
+        state.user.id === "guest-user";
+
+      const res = await claimMissionReward({
+        missionId,
+        fallbackReward: { xp, coins, title: missionTitle },
+        isGuest,
+      });
+
+      if (res.ok) {
+        dispatch({ type: "CLAIM_REWARD", missionId, xp: res.gainedXp ?? xp, coins: res.gainedCoins ?? coins, missionTitle });
+        if (res.coins !== undefined && res.xp !== undefined) {
+          dispatch({ type: "SET_WALLET_BALANCES", coins: res.coins, xp: res.xp, level: res.level });
+        }
+      }
+      return res;
+    },
   };
 }

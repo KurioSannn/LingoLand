@@ -15,6 +15,7 @@ export type DemoAction =
   | { type: "UPDATE_MISSION_PROGRESS"; missionId: string; completedObjectiveIds: string[] }
   | { type: "CLAIM_REWARD"; missionId: string; xp: number; coins: number; missionTitle: string }
   | { type: "COMPLETE_LESSON"; lessonUnitId: string; xp: number; lessonTitle: string }
+  | { type: "SET_WALLET_BALANCES"; coins?: number; xp?: number; level?: number }
   | { type: "ADD_ACTIVITY"; message: string };
 
 function recent(message: string, current: string[]): string[] {
@@ -127,6 +128,15 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
         user: { ...state.user, xp, level: calculateLevel(xp) },
         completedLessonIds: [...state.completedLessonIds, action.lessonUnitId],
         recentActivity: recent(`Lesson ${action.lessonTitle} selesai.`, state.recentActivity),
+      };
+    }
+    case "SET_WALLET_BALANCES": {
+      const coins = action.coins !== undefined ? action.coins : state.user.coins;
+      const xp = action.xp !== undefined ? action.xp : state.user.xp;
+      const level = action.level !== undefined ? action.level : (action.xp !== undefined ? calculateLevel(xp) : state.user.level);
+      return {
+        ...state,
+        user: { ...state.user, coins, xp, level },
       };
     }
     case "ADD_ACTIVITY":

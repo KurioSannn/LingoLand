@@ -148,4 +148,18 @@ describe("demoReducer", () => {
     expect(hydrated.user.name).toBe("Test User");
     expect(hydrated.user.level).toBe(3);
   });
+
+  it("handles SET_WALLET_BALANCES with server-authoritative numbers", () => {
+    const state = createInitialState(true);
+    const updated = demoReducer(state, {
+      type: "SET_WALLET_BALANCES",
+      coins: 1540,
+      xp: 620,
+      level: 4,
+    });
+
+    expect(updated.user.coins).toBe(1540);
+    expect(updated.user.xp).toBe(620);
+    expect(updated.user.level).toBe(4);
+  });
 });

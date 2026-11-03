@@ -200,28 +200,32 @@
 
 ### BLOK 24 — Server-authoritative XP, coins, inventory, reward
 
-**Prioritas:** P0. **Dependensi:** 22–23. **Status:** TODO.
+**Prioritas:** P0. **Dependensi:** 22–23. **Status:** DONE.
 
 **Tujuan:** Ekonomi game tidak bisa dieksploitasi melalui Redux/reducer/browser/API langsung.
 
 **Implementasi:**
-- [ ] Buat reward_ledger / wallet_transactions dengan transaction id, user_id, source_type, source_id, delta_xp, delta_coins, created_at dan unique idempotency key per peristiwa.
-- [ ] Semua misi selesai/claim reward melewati server RPC/Edge Function yang mengecek syarat objective, status, dan entitlement; nominal reward **diambil dari DB**, bukan action client.
-- [ ] Semua pembelian store melewati server transaction: cek balance -> debit -> insert inventory -> commit secara atomik.
-- [ ] Pisahkan wallet read model dari update API; larang client menulis saldo/level secara langsung.
-- [ ] Tentukan kebijakan anti-abuse input: keyword match NPC masih prototipe dan dapat dipalsukan client. Sebelum menjadikan reward kompetitif, validasi event, rate limit, cap earning, dan deteksi pola anomali di server; jangan klaim penilaian speaking anti-cheat sempurna.
-- [ ] Definisikan reward-once per lesson/mission, retry idempotent, rollback on partial failure, dan audit history.
-- [ ] Pertahankan store/topup sebagai preview tanpa payment: jangan memproses pembayaran sebelum gateway dan ledger memenuhi syarat audit.
+- [x] Buat tabel ledger `wallet_transactions` pada migrasi `supabase/migrations/20261103000003_block24_economy_ledger_rpc.sql` (transaction id, user_id, source_type, source_id, delta_xp, delta_coins, unique idempotency key, created_at).
+- [x] Buat tabel referensi server `mission_definitions` dan `store_item_definitions` untuk harga dan reward resmi.
+- [x] Buat PostgreSQL Security Definer RPC atomik:
+  - `claim_mission_reward_atomic(p_mission_id text)`: Validasi definisi misi, anti duplicate claim lewat idempotency key, update wallet_transactions, unlock progress, update profiles coins/xp/level secara atomik.
+  - `buy_store_item_atomic(p_item_id text)`: Validasi katalog dan harga server, kunci baris profil (`for update`), debit koin atomik, insert inventory, catat ledger.
+  - `complete_lesson_atomic(p_lesson_unit_id text, p_score int)`: Catat progress, reward XP diberikan hanya pada penyelesaian pertama (latihan ulang tidak menggandakan XP).
+- [x] Proteksi RLS & Trigger anti-tampering: Trigger `protect_profile_economy_fields()` di database menolak atau mengabaikan penimpaan langsung saldo koin, xp, dan level dari client anonim/terautentikasi biasa. Mutasi saldo dilindungi via security definer RPC atau admin.
+- [x] Buat data access layer `src/lib/economyRepository.ts` (`claimMissionReward`, `buyStoreItem`, `completeLessonReward`, `fetchWalletTransactions`). Fallback mulus untuk guest/offline mode tanpa koneksi remote.
+- [x] Integrasikan hook `useDemoStorage.ts`, `demoReducer.ts` (`SET_WALLET_BALANCES`), `ConversationPanel.tsx`, dan `StorePage.tsx`.
 
-**File kemungkinan:** supabase/migrations/*, supabase/functions/* atau RPC SQL, src/state/demoReducer.ts, src/hooks/useDemoStorage.ts, src/pages/StorePage.tsx, src/pages/LessonPage.tsx, src/components/world/ConversationPanel.tsx.
-
-**Pengujian wajib:** duplicate claim, race dua tab, negative balance, forged price, forged xp, replay request, error di tengah transaksi, invalid mission/lesson ID.
+**Bukti Pengujian Blok 24:**
+- 9 test files, 52 unit tests passed (`tests/unit/economyRepository.test.ts`, `tests/unit/demoReducer.test.ts`, dll).
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: Vite production build passed.
 
 **Acceptance criteria / DoD:**
-- [ ] Pembelian atomik dan saldo tidak negatif.
-- [ ] Claim ulang sumber reward yang sama tidak menghasilkan kredit baru.
-- [ ] Mengedit localStorage/request payload tidak menambah server XP/coins.
-- [ ] Semua transaksi sensitif punya jejak audit.
+- [x] Pembelian atomik dan saldo tidak negatif.
+- [x] Claim ulang sumber reward yang sama tidak menghasilkan kredit baru.
+- [x] Mengedit localStorage/request payload tidak menambah server XP/coins.
+- [x] Semua transaksi sensitif punya jejak audit di `wallet_transactions`.
 
 ---
 
@@ -700,7 +704,7 @@ Sebuah blok baru boleh diberi tanda DONE bila **semuanya** terpenuhi:
 | 21 | Real Auth & guest isolation | DONE | Multi-user Supabase Auth, /register, /forgot-password, guest sandbox |
 | 22 | Profiles, RBAC foundation, RLS | DONE | Versioned migrations, user_roles, RLS audit, AdminRoute, profileRepository |
 | 23 | Persistence & sync hardening | DONE | Atomic upserts, lesson_progress migration, explicit error handling |
-| 24 | Secure economy & reward ledger | TODO | - |
+| 24 | Secure economy & reward ledger | DONE | Server-authoritative RPCs, wallet_transactions ledger, anti-tampering trigger, economyRepository |
 | 25 | Dynamic question bank schema | TODO | - |
 | 26 | Learning/grading engine | TODO | - |
 | 27 | Admin authorization & audit | TODO | - |

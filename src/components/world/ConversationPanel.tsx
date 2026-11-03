@@ -2,6 +2,7 @@ import { Coins, Mic, Send, Sparkles, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { missions } from "../../data/demoData";
 import { useSpeechRecognition } from "../../hooks/useSpeechRecognition";
+import { claimMissionReward } from "../../lib/economyRepository";
 import { evaluateMissionInput, npcReply } from "../../lib/game";
 import { useDemo } from "../../state/DemoContext";
 import type { ConversationMessage, NpcCharacter } from "../../types";
@@ -52,6 +53,26 @@ export function ConversationPanel({ npc, onClose }: { npc: NpcCharacter; onClose
     setInput("");
 
     if (done && !completion) {
+      const isGuest =
+        state.isGuest ||
+        !state.isAuthenticated ||
+        state.user.id === "demo-user" ||
+        state.user.id === "guest-user";
+
+      claimMissionReward({
+        missionId: mission.id,
+        fallbackReward: { xp: mission.rewardXp, coins: mission.rewardCoins, title: mission.title },
+        isGuest,
+      })
+        .then((res) => {
+          if (res.ok && res.coins !== undefined && res.xp !== undefined) {
+            dispatch({ type: "SET_WALLET_BALANCES", coins: res.coins, xp: res.xp, level: res.level });
+          }
+        })
+        .catch(() => {
+          // Fallback to local dispatch
+        });
+
       dispatch({ type: "CLAIM_REWARD", missionId: mission.id, xp: mission.rewardXp, coins: mission.rewardCoins, missionTitle: mission.title });
       setLastReward({ xp: hasClaimedReward ? 0 : mission.rewardXp, coins: hasClaimedReward ? 0 : mission.rewardCoins, repeat: hasClaimedReward });
       setCompletion(hasClaimedReward ? "Latihan ulang selesai. Reward penuh sudah pernah diklaim." : `Misi selesai. +${mission.rewardXp} XP dan +${mission.rewardCoins} koin.`);
