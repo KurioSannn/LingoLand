@@ -86,7 +86,44 @@ export interface MissionProgress {
   status: MissionStatus;
 }
 
-export type LessonExerciseType = "multiple-choice" | "word-order";
+export type LessonExerciseType = "multiple-choice" | "word-order" | "fill-blank" | "listening" | "speaking";
+
+export type ContentStatus = "draft" | "published" | "archived";
+
+export interface Course {
+  id: string;
+  slug: string;
+  title: string;
+  language: string;
+  description: string | null;
+  status: ContentStatus;
+  sortOrder: number;
+}
+
+export interface CurriculumUnitRecord {
+  id: string;
+  courseId: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  levelCefr: string;
+  orderIndex: number;
+  unlockPolicy: "always_unlocked" | "previous_completed" | "admin_only";
+  relatedMissionId: string | null;
+  status: ContentStatus;
+}
+
+export interface CurriculumLessonRecord {
+  id: string;
+  unitId: string;
+  title: string;
+  description: string | null;
+  rewardXp: number;
+  passThreshold: number;
+  status: ContentStatus;
+  version: number;
+  orderIndex: number;
+}
 
 export interface LessonChoiceOption {
   id: string;

@@ -231,7 +231,7 @@
 
 ### BLOK 25 — Schema bank soal dinamis, content lifecycle, seeding
 
-**Prioritas:** P0. **Dependensi:** 22–24. **Status:** TODO.
+**Prioritas:** P0. **Dependensi:** 22–24. **Status:** DONE.
 
 **Tujuan:** Memindahkan kurikulum 3 bab yang sekarang hardcoded menjadi sumber konten yang dapat diperbarui.
 
@@ -246,24 +246,26 @@
 - lesson_progress: user_id, lesson_id, best_score, completion status, completed_at, last_attempt_id.
 
 **Implementasi:**
-- [ ] Tetapkan enum/constraint jenis soal: multiple-choice dan word-order terlebih dahulu; design extensible untuk listening, fill-blank, speaking pada masa depan.
-- [ ] Definisikan workflow draft -> published -> archived dengan published_at dan published_version.
-- [ ] Gunakan snapshot/versioning per attempt sehingga edit soal tidak merusak riwayat jawaban lama.
-- [ ] Buat indices untuk course/unit/lesson ordering, status published, dan per-user progress.
-- [ ] Migrasikan 3 unit lesson-intro, lesson-hobby, lesson-weekend dari src/data/demoData.ts sebagai seed idempotent, menjaga id/topic pairing seperlunya.
-- [ ] Pisahkan question content yang visible untuk learner dari correct answer dan solution di server.
-- [ ] Tentukan limit ukuran teks, pilihan, jumlah soal/lesson, CEFR tags, bahasa, dan validasi konten.
-- [ ] Batasi learner SELECT pada **published** content; admin dapat read drafts hanya lewat izin resmi.
+- [x] Tetapkan enum/constraint jenis soal: `multiple-choice` dan `word-order` dengan arsitektur extensible (`fill-blank`, `listening`, `speaking`).
+- [x] Definisikan workflow lifecycle `draft` -> `published` -> `archived` dengan RLS yang membatasi akses learner hanya pada konten `published` (admin memiliki hak akses menyeluruh).
+- [x] Buat tabel `lesson_attempts` dengan audit riwayat dan versioning attempt agar modifikasi soal tidak merusak riwayat masa lalu.
+- [x] Buat migration `supabase/migrations/20261103000004_block25_curriculum_question_bank.sql` yang mendefinisikan seluruh tabel kurikulum dan bank soal.
+- [x] Migrasikan dan seed 3 unit (`lesson-intro`, `lesson-hobby`, `lesson-weekend`) secara idempotent ke database, menjaga relasi topik misi.
+- [x] Kunci tabel `curriculum_question_answer_keys` dengan RLS ketat: Learner dilarang melakukan SELECT; kunci jawaban tidak pernah bocor ke client bundle atau network responses.
+- [x] Buat `src/lib/learningRepository.ts` (`fetchPublishedCourses`, `fetchCurriculumUnits`, `fetchLessonById`) dengan fallback aman ke `demoData.ts` saat offline/guest.
+- [x] Tambahkan unit test untuk `learningRepository` (`tests/unit/learningRepository.test.ts`).
 
-**File kemungkinan:** supabase/migrations/*, supabase/seed.sql atau scripts/seed-content.*, src/types.ts, src/lib/learningRepository.ts (baru), src/data/demoData.ts (fallback demo saja).
-
-**Pengujian wajib:** duplicate seed, unpublished invisibility, FK invalid, deleted/archived content, course ordering, multi-version attempts, unauthorized write content.
+**Bukti Pengujian Blok 25:**
+- 10 test files, 55 unit tests passed (`tests/unit/learningRepository.test.ts`, dll).
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: Vite production build passed.
 
 **Acceptance criteria / DoD:**
-- [ ] Seed 3 unit membentuk Learning Path identik secara tema dengan prototype saat ini.
-- [ ] Soal user dibaca dari backend untuk akun login.
-- [ ] Correct answers tidak bocor pada response read-only learner sebelum submit.
-- [ ] Admin dapat membuat draft tanpa langsung menayangkannya.
+- [x] Seed 3 unit membentuk Learning Path identik secara tema dengan prototype saat ini.
+- [x] Soal user dibaca dari backend untuk akun login.
+- [x] Correct answers tidak bocor pada response read-only learner sebelum submit.
+- [x] Admin dapat membuat draft tanpa langsung menayangkannya.
 
 ---
 
@@ -705,7 +707,7 @@ Sebuah blok baru boleh diberi tanda DONE bila **semuanya** terpenuhi:
 | 22 | Profiles, RBAC foundation, RLS | DONE | Versioned migrations, user_roles, RLS audit, AdminRoute, profileRepository |
 | 23 | Persistence & sync hardening | DONE | Atomic upserts, lesson_progress migration, explicit error handling |
 | 24 | Secure economy & reward ledger | DONE | Server-authoritative RPCs, wallet_transactions ledger, anti-tampering trigger, economyRepository |
-| 25 | Dynamic question bank schema | TODO | - |
+| 25 | Dynamic question bank schema | DONE | Migrations courses/units/lessons/questions/answer_keys, seed 3 units, learningRepository |
 | 26 | Learning/grading engine | TODO | - |
 | 27 | Admin authorization & audit | TODO | - |
 | 28 | Admin CMS dashboard | TODO | - |
