@@ -62,18 +62,23 @@ alter table public.inventory_items enable row level security;
 alter table public.mission_progress enable row level security;
 alter table public.claimed_rewards enable row level security;
 
+drop policy if exists "profiles_owner" on public.profiles;
 create policy "profiles_owner" on public.profiles
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "avatar_configs_owner" on public.avatar_configs;
 create policy "avatar_configs_owner" on public.avatar_configs
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "inventory_items_owner" on public.inventory_items;
 create policy "inventory_items_owner" on public.inventory_items
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "mission_progress_owner" on public.mission_progress;
 create policy "mission_progress_owner" on public.mission_progress
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "claimed_rewards_owner" on public.claimed_rewards;
 create policy "claimed_rewards_owner" on public.claimed_rewards
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
@@ -140,10 +145,12 @@ drop policy if exists "user_roles_read_own_or_admin" on public.user_roles;
 drop policy if exists "user_roles_service_role_all" on public.user_roles;
 
 -- Users can read their own assigned roles; Admins can view all user roles
+drop policy if exists "user_roles_read_own_or_admin" on public.user_roles;
 create policy "user_roles_read_own_or_admin" on public.user_roles
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
 
 -- Only service_role can directly insert/update/delete user_roles
+drop policy if exists "user_roles_service_role_all" on public.user_roles;
 create policy "user_roles_service_role_all" on public.user_roles
   for all using (auth.jwt() ->> 'role' = 'service_role');
 
@@ -188,14 +195,17 @@ drop policy if exists "profiles_insert_own" on public.profiles;
 drop policy if exists "profiles_update_own" on public.profiles;
 
 -- Read policy: Owner can read full profile, others can read public profiles (is_private = false), admin can read all
+drop policy if exists "profiles_select_own_or_public" on public.profiles;
 create policy "profiles_select_own_or_public" on public.profiles
   for select using (auth.uid() = user_id or is_private = false or public.is_admin(auth.uid()));
 
 -- Insert policy: Authenticated users can insert their own profile
+drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
   for insert with check (auth.uid() = user_id);
 
 -- Update policy: Users can update their own profile, Admins can update any profile
+drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own" on public.profiles
   for update using (auth.uid() = user_id or public.is_admin(auth.uid()))
   with check (auth.uid() = user_id or public.is_admin(auth.uid()));
@@ -243,16 +253,20 @@ drop policy if exists "lesson_progress_owner" on public.lesson_progress;
 drop policy if exists "lesson_progress_select_own_or_admin" on public.lesson_progress;
 
 -- Users can read their own lesson progress; Admins can read all for analytics
+drop policy if exists "lesson_progress_select_own_or_admin" on public.lesson_progress;
 create policy "lesson_progress_select_own_or_admin" on public.lesson_progress
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
 
 -- Users can insert/update their own lesson progress
+drop policy if exists "lesson_progress_insert_own" on public.lesson_progress;
 create policy "lesson_progress_insert_own" on public.lesson_progress
   for insert with check (auth.uid() = user_id);
 
+drop policy if exists "lesson_progress_update_own" on public.lesson_progress;
 create policy "lesson_progress_update_own" on public.lesson_progress
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "lesson_progress_delete_own" on public.lesson_progress;
 create policy "lesson_progress_delete_own" on public.lesson_progress
   for delete using (auth.uid() = user_id or public.is_admin(auth.uid()));
 
@@ -297,9 +311,11 @@ alter table public.wallet_transactions enable row level security;
 drop policy if exists "wallet_transactions_select_own_or_admin" on public.wallet_transactions;
 drop policy if exists "wallet_transactions_service_role_all" on public.wallet_transactions;
 
+drop policy if exists "wallet_transactions_select_own_or_admin" on public.wallet_transactions;
 create policy "wallet_transactions_select_own_or_admin" on public.wallet_transactions
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
 
+drop policy if exists "wallet_transactions_service_role_all" on public.wallet_transactions;
 create policy "wallet_transactions_service_role_all" on public.wallet_transactions
   for all using (auth.jwt() ->> 'role' = 'service_role');
 
@@ -314,6 +330,7 @@ create table if not exists public.mission_definitions (
 );
 
 alter table public.mission_definitions enable row level security;
+drop policy if exists "mission_definitions_read_all" on public.mission_definitions;
 create policy "mission_definitions_read_all" on public.mission_definitions
   for select using (is_active = true or public.is_admin(auth.uid()));
 
@@ -338,6 +355,7 @@ create table if not exists public.store_item_definitions (
 );
 
 alter table public.store_item_definitions enable row level security;
+drop policy if exists "store_item_definitions_read_all" on public.store_item_definitions;
 create policy "store_item_definitions_read_all" on public.store_item_definitions
   for select using (is_active = true or public.is_admin(auth.uid()));
 
@@ -724,30 +742,39 @@ alter table public.curriculum_question_answer_keys enable row level security;
 alter table public.lesson_attempts enable row level security;
 
 -- Courses: Public/Learners can view published, Admins can view all and mutate
+drop policy if exists "courses_select_published_or_admin" on public.courses;
 create policy "courses_select_published_or_admin" on public.courses
   for select using (status = 'published' or public.is_admin(auth.uid()));
+drop policy if exists "courses_admin_all" on public.courses;
 create policy "courses_admin_all" on public.courses
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Units: Public/Learners can view published, Admins can view all and mutate
+drop policy if exists "units_select_published_or_admin" on public.curriculum_units;
 create policy "units_select_published_or_admin" on public.curriculum_units
   for select using (status = 'published' or public.is_admin(auth.uid()));
+drop policy if exists "units_admin_all" on public.curriculum_units;
 create policy "units_admin_all" on public.curriculum_units
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Lessons: Public/Learners can view published, Admins can view all and mutate
+drop policy if exists "lessons_select_published_or_admin" on public.curriculum_lessons;
 create policy "lessons_select_published_or_admin" on public.curriculum_lessons
   for select using (status = 'published' or public.is_admin(auth.uid()));
+drop policy if exists "lessons_admin_all" on public.curriculum_lessons;
 create policy "lessons_admin_all" on public.curriculum_lessons
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Questions: Public/Learners can view published, Admins can view all and mutate
+drop policy if exists "questions_select_published_or_admin" on public.curriculum_questions;
 create policy "questions_select_published_or_admin" on public.curriculum_questions
   for select using (status = 'published' or public.is_admin(auth.uid()));
+drop policy if exists "questions_admin_all" on public.curriculum_questions;
 create policy "questions_admin_all" on public.curriculum_questions
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Question Options: Public/Learners can view options of published questions
+drop policy if exists "question_options_select_published" on public.curriculum_question_options;
 create policy "question_options_select_published" on public.curriculum_question_options
   for select using (
     exists (
@@ -756,16 +783,20 @@ create policy "question_options_select_published" on public.curriculum_question_
       and (q.status = 'published' or public.is_admin(auth.uid()))
     )
   );
+drop policy if exists "question_options_admin_all" on public.curriculum_question_options;
 create policy "question_options_admin_all" on public.curriculum_question_options
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Question Answer Keys: STRICT SERVER-ONLY / ADMIN-ONLY (Learners NEVER have SELECT access!)
+drop policy if exists "answer_keys_admin_and_service_only" on public.curriculum_question_answer_keys;
 create policy "answer_keys_admin_and_service_only" on public.curriculum_question_answer_keys
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
 -- Lesson Attempts: Learners can read and insert their own attempts
+drop policy if exists "lesson_attempts_owner_select" on public.lesson_attempts;
 create policy "lesson_attempts_owner_select" on public.lesson_attempts
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
+drop policy if exists "lesson_attempts_owner_insert" on public.lesson_attempts;
 create policy "lesson_attempts_owner_insert" on public.lesson_attempts
   for insert with check (auth.uid() = user_id);
 
@@ -1052,9 +1083,11 @@ alter table public.admin_audit_logs enable row level security;
 drop policy if exists "admin_audit_logs_select_admin" on public.admin_audit_logs;
 drop policy if exists "admin_audit_logs_insert_admin" on public.admin_audit_logs;
 
+drop policy if exists "admin_audit_logs_select_admin" on public.admin_audit_logs;
 create policy "admin_audit_logs_select_admin" on public.admin_audit_logs
   for select using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
+drop policy if exists "admin_audit_logs_insert_admin" on public.admin_audit_logs;
 create policy "admin_audit_logs_insert_admin" on public.admin_audit_logs
   for insert with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
 
@@ -1604,10 +1637,12 @@ alter table public.world_rooms enable row level security;
 alter table public.room_memberships enable row level security;
 
 -- World definitions are publicly readable
+drop policy if exists "world_definitions_select_all" on public.world_definitions;
 create policy "world_definitions_select_all" on public.world_definitions
   for select using (true);
 
 -- World rooms: Public rooms visible to all authenticated users, private visible to creator/admin
+drop policy if exists "world_rooms_select_accessible" on public.world_rooms;
 create policy "world_rooms_select_accessible" on public.world_rooms
   for select using (
     visibility = 'public'
@@ -1617,6 +1652,7 @@ create policy "world_rooms_select_accessible" on public.world_rooms
   );
 
 -- Room memberships: visible to members in the same room or admin
+drop policy if exists "room_memberships_select_room" on public.room_memberships;
 create policy "room_memberships_select_room" on public.room_memberships
   for select using (
     auth.uid() = user_id
@@ -2194,9 +2230,11 @@ drop policy if exists "lesson_progress_delete_own" on public.lesson_progress;
 drop policy if exists "lesson_progress_select_own_or_admin" on public.lesson_progress;
 drop policy if exists "lesson_progress_admin_all" on public.lesson_progress;
 
+drop policy if exists "lesson_progress_select_own_or_admin" on public.lesson_progress;
 create policy "lesson_progress_select_own_or_admin" on public.lesson_progress
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
 
+drop policy if exists "lesson_progress_admin_all" on public.lesson_progress;
 create policy "lesson_progress_admin_all" on public.lesson_progress
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'))
   with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
@@ -2206,9 +2244,11 @@ drop policy if exists "claimed_rewards_owner" on public.claimed_rewards;
 drop policy if exists "claimed_rewards_select_own_or_admin" on public.claimed_rewards;
 drop policy if exists "claimed_rewards_admin_all" on public.claimed_rewards;
 
+drop policy if exists "claimed_rewards_select_own_or_admin" on public.claimed_rewards;
 create policy "claimed_rewards_select_own_or_admin" on public.claimed_rewards
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
 
+drop policy if exists "claimed_rewards_admin_all" on public.claimed_rewards;
 create policy "claimed_rewards_admin_all" on public.claimed_rewards
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'))
   with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
@@ -2218,9 +2258,11 @@ drop policy if exists "inventory_items_owner" on public.inventory_items;
 drop policy if exists "inventory_items_select_own_or_admin" on public.inventory_items;
 drop policy if exists "inventory_items_admin_all" on public.inventory_items;
 
+drop policy if exists "inventory_items_select_own_or_admin" on public.inventory_items;
 create policy "inventory_items_select_own_or_admin" on public.inventory_items
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
 
+drop policy if exists "inventory_items_admin_all" on public.inventory_items;
 create policy "inventory_items_admin_all" on public.inventory_items
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'))
   with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
@@ -2230,9 +2272,11 @@ drop policy if exists "mission_progress_owner" on public.mission_progress;
 drop policy if exists "mission_progress_select_own_or_admin" on public.mission_progress;
 drop policy if exists "mission_progress_admin_all" on public.mission_progress;
 
+drop policy if exists "mission_progress_select_own_or_admin" on public.mission_progress;
 create policy "mission_progress_select_own_or_admin" on public.mission_progress
   for select using (auth.uid() = user_id or public.is_admin(auth.uid()));
 
+drop policy if exists "mission_progress_admin_all" on public.mission_progress;
 create policy "mission_progress_admin_all" on public.mission_progress
   for all using (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'))
   with check (public.is_admin(auth.uid()) or (auth.jwt() ->> 'role' = 'service_role'));
