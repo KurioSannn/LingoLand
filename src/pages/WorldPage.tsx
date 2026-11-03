@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Coins, DoorOpen, Keyboard, Loader2, MessageCircle, RefreshCw } from "lucide-react";
+import { CheckCircle2, Circle, Coins, DoorOpen, Keyboard, Loader2, MessageCircle, RefreshCw, Sparkles } from "lucide-react";
 import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -131,10 +131,21 @@ export function WorldPage() {
               <span className="world-room-name">Mini Home</span>
               <Badge tone="prototype">Prototype Interaksi</Badge>
             </div>
-            <button className="button button-secondary world-exit" type="button" onClick={() => navigate("/app/home")}>
-              <DoorOpen size={16} aria-hidden />
-              Keluar Room
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                className="button button-secondary world-exit flex items-center gap-1.5 text-xs font-semibold"
+                type="button"
+                onClick={() => navigate("/app/plaza")}
+                title="Buka Social Plaza Multiplayer"
+              >
+                <Sparkles size={15} className="text-primary-500" aria-hidden />
+                <span>Ke Social Plaza</span>
+              </button>
+              <button className="button button-secondary world-exit" type="button" onClick={() => navigate("/app/home")}>
+                <DoorOpen size={16} aria-hidden />
+                Keluar Room
+              </button>
+            </div>
           </div>
 
           {/* Mission chip (mobile) */}

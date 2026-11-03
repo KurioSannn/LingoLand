@@ -15,6 +15,7 @@ import { LessonsPage } from "./pages/LessonsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { SocialPlazaPage } from "./pages/SocialPlazaPage";
 import { StorePage } from "./pages/StorePage";
 import { TopUpPage } from "./pages/TopUpPage";
 import { WorldPage } from "./pages/WorldPage";
@@ -44,6 +45,8 @@ export function App() {
         <Route path="avatar" element={<AvatarPage />} />
         <Route path="avatar-chat" element={<AvatarChatPage />} />
         <Route path="world" element={<WorldPage />} />
+        <Route path="plaza" element={<SocialPlazaPage />} />
+        <Route path="plaza/:roomId" element={<SocialPlazaPage />} />
         <Route path="friends" element={<FriendsPage />} />
         <Route path="store" element={<StorePage />} />
         <Route path="topup" element={<TopUpPage />} />

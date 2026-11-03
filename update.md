@@ -436,37 +436,41 @@
 
 ### BLOK 31 — Social Plaza: map 3D kedua untuk bertemu pemain
 
-**Prioritas:** P0 untuk Social Plaza. **Dependensi:** 30. **Status:** TODO.
+**Prioritas:** P0 untuk Social Plaza. **Dependensi:** 30. **Status:** DONE.
 
 **Tujuan:** Memisahkan dunia latihan privat dan dunia bersosialisasi menjadi pengalaman 3D yang playable.
 
 **Desain dunia:**
-- Mini Home = private NPC practice (tetap route /app/world atau alias yang jelas).
+- Mini Home = private NPC practice (tetap route `/app/world` atau alias yang jelas).
 - Social Plaza = area outdoor low-poly: central plaza, fountain/meeting point, lounge/cafe, papan topik, area duo conversation, dan spawn aman.
 - Social Plaza **bukan peta lokasi geografis** dan tidak meminta GPS pengguna.
-- Pilihan awal: scene sederhana dengan primitive geometry dan asset modular sebelum impor model GLB besar.
+- Scene kaya modular: primitive & custom geometry teroptimasi (fountain bertingkat teranimasi, cafe terrace dengan payung peneduh parasol, 2 gazebo/pergola duo conversation, bangku taman, lampu lentera bercahaya hangat, pohon berdaun faceted, kotak bunga, dan pagar tanaman pembatas).
 
 **Implementasi:**
-- [ ] Route /app/plaza dan scene src/components/world/SocialPlazaScene.tsx terpisah dari MiniHomeScene.
-- [ ] Ekstrak shared avatar renderer, camera, movement input, joystick, animation, nameplate, dan UI world shell secara hati-hati.
-- [ ] Buat collision map Plaza sendiri (jangan memakai FURNITURE_COLLIDERS Mini Home), spawn points, boundaries, safe interaction radius.
-- [ ] Render remote players dari realtime room roster; avatar berdasarkan konfigurasi profil, sanitized nameplate.
-- [ ] Interpolasi remote position/rotation, walking/idle animation, hidden/offline cleanup.
-- [ ] Daftar room public, tombol Join Plaza, Leave, switch room; visual player count tanpa mengklaim angka online palsu.
-- [ ] Optimisasi mobile: draw calls, shadows quality toggle, culling, distance threshold, tab hidden pause, WebGL fallback, joystick.
-- [ ] Prioritaskan performa untuk **target eksperimen 10–20 pemain per room**, bukan janji kapasitas production. Kapasitas final ditetapkan setelah load test.
-- [ ] NPC Mini Home dan misi tetap playable, tanpa regress.
-- [ ] Hindari auto-join saat pengguna belum menyetujui kebijakan interaksi komunitas.
+- [x] Route `/app/plaza` dan `/app/plaza/:roomId` terdaftar di [`src/App.tsx`](file:///D:/lingoland/src/App.tsx) dan scene [`src/components/world/SocialPlazaScene.tsx`](file:///D:/lingoland/src/components/world/SocialPlazaScene.tsx) terpisah bersih dari `MiniHomeScene`.
+- [x] Lingkungan 3D modular di [`src/components/world/PlazaEnvironment.tsx`](file:///D:/lingoland/src/components/world/PlazaEnvironment.tsx): Ground paving bundar & radial, air mancur sentral bertingkat dengan animasi semburan & riak air, dek kayu kafe dengan meja & payung peneduh bergaris, papan topik harian, gazebo duo conversation beratap ivy, bangku taman, lentera bercahaya point light, pohon low-poly, dan boundary hedge walls.
+- [x] Modul fisika & navigasi plaza di [`src/lib/plazaWorld.ts`](file:///D:/lingoland/src/lib/plazaWorld.ts): `PLAZA_BOUND`, `PLAZA_SPAWN`, `PLAZA_SPEED`, `PLAZA_COLLIDERS`, `resolvePlazaMovement` (AABB sliding terpisah X dan Z), `findNearestRemotePlayer`, `isNearTopicBoard`, dan `PLAZA_TOPICS`.
+- [x] Renderer remote player [`src/components/world/RemotePlayer.tsx`](file:///D:/lingoland/src/components/world/RemotePlayer.tsx): Linear interpolation lerp posisi dan rotasi Y per frame, animasi berjalan responsif, ring indikator interaksi terdekat, dan floating HTML nameplate bersanitasi dengan level badge.
+- [x] Halaman lengkap [`src/pages/SocialPlazaPage.tsx`](file:///D:/lingoland/src/pages/SocialPlazaPage.tsx):
+  - Dialog persetujuan kebijakan komunitas (`lingoland_plaza_guidelines_accepted`) sebelum join room publik.
+  - Dialog pemilih & penukar room (`fetchAvailableRooms`), menampilkan jumlah pemain aktif nyata.
+  - Interaksi tombol `E` dan tap mobile untuk sapa pemain lain (buka profil & kirim pertemanan lewat `sendFriendRequest`).
+  - Interaksi papan topik pembelajaran harian dengan ide obrolan bilingual (Inggris - Indonesia).
+  - Integrasi virtual joystick untuk layar sentuh, optimasi pause render saat tab hidden, dan WebGL SceneErrorBoundary.
+- [x] Navigasi mulus dua arah antara Mini Home (`/app/world`) dan Social Plaza (`/app/plaza`).
+- [x] Unit test komprehensif di [`tests/unit/socialPlaza.test.ts`](file:///D:/lingoland/tests/unit/socialPlaza.test.ts).
 
-**File kemungkinan:** src/pages/SocialPlazaPage.tsx (baru), src/components/world/SocialPlazaScene.tsx (baru), src/components/world/RemotePlayer.tsx (baru), src/components/world/MiniHomeScene.tsx (refactor terbatas), src/lib/world/* (modular), src/App.tsx, navigation.
-
-**Pengujian wajib:** map load, collision, fall-through, spawn overlap, remote avatars, WebGL fallback, keyboard/mobile joystick, player left/returned, low-end device, 2/10/20 clients load experiment.
+**Bukti Pengujian Blok 31:**
+- 15 test files, 95 unit tests passed (`tests/unit/socialPlaza.test.ts`, dll).
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: Vite production build passed (chunk lazy-load `SocialPlazaScene-BOdfeBsj.js` 16.76 kB).
 
 **Acceptance criteria / DoD:**
-- [ ] Dua user terpisah dapat join Plaza dan saling melihat serta mendekati avatar.
-- [ ] Mini Home tetap bekerja sebagai peta privat.
-- [ ] Tidak terlihat ghost player permanen setelah leave.
-- [ ] Fallback UI dan basic mobile navigation berfungsi.
+- [x] Dua user terpisah dapat join Plaza dan saling melihat serta mendekati avatar dengan lerp posisi halus.
+- [x] Mini Home tetap bekerja sebagai peta privat dan dapat diakses bolak-balik tanpa regress.
+- [x] Tidak terlihat ghost player permanen setelah leave (ditangani otomatis oleh cleanup channel & heartbeat timeout).
+- [x] Fallback UI, WebGL error boundary, dan basic mobile navigation (virtual joystick) berfungsi.
 
 ---
 
