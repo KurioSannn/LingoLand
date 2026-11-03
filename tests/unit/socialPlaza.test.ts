@@ -76,7 +76,8 @@ describe("Social Plaza World Mechanics", () => {
     // Kasus 1: Belum ada pemain remote
     expect(findNearestRemotePlayer(myPos, remoteMap)).toBeNull();
 
-    // Kasus 2: Pemain remote terlalu jauh (> 2.4)
+    // Kasus 2: Pemain remote terlalu jauh (> PLAZA_INTERACTION_RADIUS)
+    expect(PLAZA_INTERACTION_RADIUS).toBeGreaterThan(0);
     remoteMap.set("p-far", {
       presence: {
         playerId: "p-far",

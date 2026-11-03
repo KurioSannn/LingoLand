@@ -6,10 +6,10 @@ import {
   Keyboard,
   Loader2,
   MessageCircle,
+  MessageSquare,
   RefreshCw,
   ShieldCheck,
   Sparkles,
-  UserPlus,
   Users,
 } from "lucide-react";
 import {
@@ -28,6 +28,9 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
 import { Toast } from "../components/ui/Toast";
+import { DuoPracticeBanner } from "../components/world/DuoPracticeBanner";
+import { PlayerInteractionPanel } from "../components/world/PlayerInteractionPanel";
+import { RoomChatOverlay } from "../components/world/RoomChatOverlay";
 import { VirtualJoystick } from "../components/world/VirtualJoystick";
 import { useCharacterControls } from "../hooks/useCharacterControls";
 import { useDemoAuth } from "../hooks/useDemoAuth";
@@ -36,7 +39,8 @@ import {
   type RemotePlayerState,
   useMultiplayerRoom,
 } from "../hooks/useMultiplayerRoom";
-import { sendFriendRequest } from "../lib/friendsRepository";
+import { useRoomChat } from "../hooks/useRoomChat";
+import { blockUser, sendFriendRequest } from "../lib/friendsRepository";
 import { PLAZA_TOPICS } from "../lib/plazaWorld";
 import type { PlayerPresence } from "../lib/realtime/protocol";
 import {
@@ -106,9 +110,12 @@ export function SocialPlazaPage() {
   const nearTopicBoardRef = useRef(false);
   const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
 
+  // Chat & Moderation State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+
   // Toast Feedback
   const [toastMessage, setToastMessage] = useState("");
-  const [sendingRequest, setSendingRequest] = useState(false);
 
   // Player presence object
   const playerProfile: PlayerPresence = useMemo(() => {
@@ -122,7 +129,7 @@ export function SocialPlazaPage() {
     };
   }, [currentUser, state.avatar]);
 
-  // Hook Multiplayer Room
+  // Hook Multiplayer Room (Presence & Movement)
   const { isConnected, connectionError, remotePlayers, broadcastMovement } =
     useMultiplayerRoom({
       roomId: activeRoomId,
@@ -130,6 +137,36 @@ export function SocialPlazaPage() {
       enabled: guidelinesAccepted && webglOk && !sceneError,
       isGuest: currentUser.isGuest,
     });
+
+  // Hook Room Chat, Duo Practice & Safety Moderation
+  const {
+    messages,
+    mutedUserIds,
+    activePractice,
+    pendingInvite,
+    sendMessage,
+    sendPracticeInvite,
+    respondPracticeInvite,
+    endPracticeSession,
+    muteUser: handleMuteUser,
+    unmuteUser: handleUnmuteUser,
+  } = useRoomChat({
+    roomId: activeRoomId,
+    currentUser,
+    enabled: guidelinesAccepted && webglOk && !sceneError,
+  });
+
+  // Filter out blocked players from 3D scene and list
+  const visibleRemotePlayers = useMemo(() => {
+    if (blockedUserIds.length === 0) return remotePlayers;
+    const filtered = new Map<string, RemotePlayerState>();
+    for (const [id, p] of remotePlayers.entries()) {
+      if (!blockedUserIds.includes(id)) {
+        filtered.set(id, p);
+      }
+    }
+    return filtered;
+  }, [remotePlayers, blockedUserIds]);
 
   // Fetch list of available rooms
   useEffect(() => {
@@ -155,9 +192,14 @@ export function SocialPlazaPage() {
 
   // Handle nearest player
   const handleNearestPlayerChange = useCallback((player: RemotePlayerState | null) => {
+    if (player && blockedUserIds.includes(player.presence.playerId)) {
+      nearestPlayerRef.current = null;
+      setNearestPlayer(null);
+      return;
+    }
     nearestPlayerRef.current = player;
     setNearestPlayer(player);
-  }, []);
+  }, [blockedUserIds]);
 
   // Handle near topic board
   const handleNearTopicBoardChange = useCallback((near: boolean) => {
@@ -179,9 +221,9 @@ export function SocialPlazaPage() {
   const isModalOpen =
     isTopicModalOpen || selectedPlayer !== null || isRoomModalOpen || !guidelinesAccepted;
 
-  // Kontrol keyboard / virtual joystick
+  // Kontrol keyboard / virtual joystick (nonaktifkan saat modal terbuka atau sedang mengetik chat)
   const { getDirection, setJoystick } = useCharacterControls({
-    enabled: !isModalOpen && webglOk && !sceneError,
+    enabled: !isModalOpen && !isChatOpen && webglOk && !sceneError,
     onInteract: handleInteract,
   });
 
@@ -211,16 +253,23 @@ export function SocialPlazaPage() {
     }
 
     try {
-      setSendingRequest(true);
       const res = await sendFriendRequest(targetUsername, currentUser.isGuest);
       setToastMessage(res.message);
-      if (res.ok) {
+    } catch (err) {
+      setToastMessage(err instanceof Error ? err.message : "Gagal mengirim permintaan.");
+    }
+  }
+
+  async function handleBlockUser(targetId: string) {
+    try {
+      const res = await blockUser(targetId, currentUser.isGuest);
+      setToastMessage(res.message);
+      setBlockedUserIds((prev) => [...prev, targetId]);
+      if (selectedPlayer?.presence.playerId === targetId) {
         setSelectedPlayer(null);
       }
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : "Gagal mengirim permintaan.");
-    } finally {
-      setSendingRequest(false);
+      setToastMessage(err instanceof Error ? err.message : "Gagal memblokir pengguna.");
     }
   }
 
@@ -229,8 +278,8 @@ export function SocialPlazaPage() {
     setSceneKey((prev) => prev + 1);
   }
 
-  // Active players count (self + remote players)
-  const totalActivePlayers = remotePlayers.size + (isConnected ? 1 : 0);
+  // Active players count (self + visible remote players)
+  const totalActivePlayers = visibleRemotePlayers.size + (isConnected ? 1 : 0);
 
   return (
     <section className="world-page">
@@ -269,9 +318,9 @@ export function SocialPlazaPage() {
                 <SocialPlazaScene
                   avatar={state.avatar}
                   playerProfile={playerProfile}
-                  movementEnabled={!isModalOpen}
+                  movementEnabled={!isModalOpen && !isChatOpen}
                   getDirection={getDirection}
-                  remotePlayers={remotePlayers}
+                  remotePlayers={visibleRemotePlayers}
                   onBroadcastMovement={broadcastMovement}
                   nearestPlayerId={nearestPlayer?.presence.playerId ?? null}
                   onNearestPlayerChange={handleNearestPlayerChange}
@@ -325,6 +374,16 @@ export function SocialPlazaPage() {
             </div>
           </div>
 
+          {/* Banner Undangan & Sesi Latihan Duo */}
+          <DuoPracticeBanner
+            activePractice={activePractice}
+            pendingInvite={pendingInvite}
+            onAcceptInvite={(inv) => respondPracticeInvite(inv, true)}
+            onDeclineInvite={(inv) => respondPracticeInvite(inv, false)}
+            onSendPracticePrompt={(prompt) => sendMessage(prompt, "practice")}
+            onEndPractice={endPracticeSession}
+          />
+
           {/* Error Banner jika Realtime bermasalah */}
           {connectionError && (
             <div className="absolute inset-x-4 top-16 z-20 rounded-md bg-amber-500/95 px-3 py-2 text-center text-xs font-semibold text-white shadow-layer">
@@ -333,12 +392,12 @@ export function SocialPlazaPage() {
           )}
 
           {/* Interaction Prompts (Desktop) */}
-          {nearTopicBoard && !isModalOpen ? (
+          {nearTopicBoard && !isModalOpen && !isChatOpen ? (
             <p className="world-prompt" role="status">
               <Keyboard size={16} aria-hidden />
               Tekan E untuk membaca Papan Topik Harian
             </p>
-          ) : nearestPlayer && !isModalOpen ? (
+          ) : nearestPlayer && !isModalOpen && !isChatOpen ? (
             <p className="world-prompt" role="status">
               <Keyboard size={16} aria-hidden />
               Tekan E untuk menyapa {nearestPlayer.presence.name || nearestPlayer.presence.username}
@@ -349,7 +408,7 @@ export function SocialPlazaPage() {
           <p className="world-hint">WASD / panah untuk berjalan · E untuk interaksi</p>
 
           {/* Mobile Joystick & Quick Action Button */}
-          {webglOk && !sceneError && !isModalOpen && guidelinesAccepted ? (
+          {webglOk && !sceneError && !isModalOpen && !isChatOpen && guidelinesAccepted ? (
             <>
               <div className="world-joystick">
                 <VirtualJoystick onChange={setJoystick} />
@@ -422,7 +481,7 @@ export function SocialPlazaPage() {
               </li>
 
               {/* Remote Players */}
-              {Array.from(remotePlayers.values()).map((rp) => (
+              {Array.from(visibleRemotePlayers.values()).map((rp) => (
                 <li
                   key={rp.presence.playerId}
                   className="flex items-center justify-between rounded-md border border-neutral-200 bg-white px-3 py-2 text-xs transition hover:bg-neutral-50"
@@ -436,18 +495,23 @@ export function SocialPlazaPage() {
                     >
                       {rp.presence.name || rp.presence.username || "Pemain"}
                     </button>
+                    {mutedUserIds.includes(rp.presence.playerId) && (
+                      <span className="rounded bg-neutral-200 px-1 py-0.2 text-[9px] font-bold text-neutral-600">
+                        Muted
+                      </span>
+                    )}
                   </div>
                   <Button
                     variant="ghost"
                     className="h-7 px-2 text-[11px]"
                     onClick={() => setSelectedPlayer(rp)}
                   >
-                    Profil
+                    Interaksi
                   </Button>
                 </li>
               ))}
 
-              {remotePlayers.size === 0 && (
+              {visibleRemotePlayers.size === 0 && (
                 <li className="py-4 text-center text-xs text-neutral-400">
                   Belum ada pemain lain di room ini. Ajak temanmu bergabung!
                 </li>
@@ -455,7 +519,20 @@ export function SocialPlazaPage() {
             </ul>
           </div>
 
-          <div className="mt-6 border-t border-neutral-200 pt-4">
+          <div className="mt-6 flex flex-col gap-2 border-t border-neutral-200 pt-4">
+            <Button
+              variant="primary"
+              className="w-full text-xs flex items-center justify-center gap-2"
+              onClick={() => setIsChatOpen(true)}
+            >
+              <MessageSquare size={16} />
+              <span>Buka Obrolan Plaza</span>
+              {messages.length > 0 && (
+                <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+                  {messages.length}
+                </span>
+              )}
+            </Button>
             <Button
               variant="secondary"
               className="w-full text-xs"
@@ -467,6 +544,15 @@ export function SocialPlazaPage() {
           </div>
         </aside>
       </div>
+
+      {/* Floating Room Chat Overlay */}
+      <RoomChatOverlay
+        messages={messages}
+        onSendMessage={(text) => sendMessage(text, activePractice ? "practice" : "room")}
+        isOpen={isChatOpen}
+        onToggle={() => setIsChatOpen((prev) => !prev)}
+        currentUserId={currentUser.id}
+      />
 
       {/* MODAL 1: Community Guidelines Modal */}
       <Modal
@@ -586,54 +672,22 @@ export function SocialPlazaPage() {
         </div>
       </Modal>
 
-      {/* MODAL 4: Detail Pemain & Tambah Teman */}
-      <Modal
-        isOpen={selectedPlayer !== null}
-        title="Profil Pemain"
-        onClose={() => setSelectedPlayer(null)}
-      >
-        {selectedPlayer && (
-          <div className="mt-3 space-y-4">
-            <div className="flex items-center gap-3 rounded-lg bg-neutral-50 p-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-lg font-bold text-primary-700">
-                {(selectedPlayer.presence.name || "P")[0].toUpperCase()}
-              </div>
-              <div>
-                <h4 className="text-base font-bold text-neutral-950">
-                  {selectedPlayer.presence.name || selectedPlayer.presence.username}
-                </h4>
-                <p className="text-xs text-neutral-500">
-                  @{selectedPlayer.presence.username} · Lv.{selectedPlayer.presence.level ?? 1}
-                </p>
-                <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Sedang berada di Social Plaza
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2 text-xs text-neutral-600">
-              <p>
-                Ajak berlatih percakapan bahasa Inggris bersama di area kafe atau duo pergola.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 pt-2">
-              <Button
-                variant="primary"
-                onClick={() => handleSendFriendRequest(selectedPlayer.presence.username)}
-                disabled={sendingRequest}
-              >
-                <UserPlus size={16} />
-                {sendingRequest ? "Mengirim..." : "Kirim Permintaan Pertemanan"}
-              </Button>
-              <Button variant="secondary" onClick={() => setSelectedPlayer(null)}>
-                Tutup
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      {/* MODAL 4: Panel Interaksi Pemain & Duo Practice / Moderasi */}
+      {selectedPlayer && (
+        <PlayerInteractionPanel
+          player={selectedPlayer}
+          isOpen={selectedPlayer !== null}
+          onClose={() => setSelectedPlayer(null)}
+          onSendFriendRequest={handleSendFriendRequest}
+          onSendPracticeInvite={sendPracticeInvite}
+          onBlockUser={handleBlockUser}
+          onMuteUser={handleMuteUser}
+          onUnmuteUser={handleUnmuteUser}
+          isMuted={mutedUserIds.includes(selectedPlayer.presence.playerId)}
+          roomId={activeRoomId}
+          isGuest={currentUser.isGuest}
+        />
+      )}
 
       {/* Toast Feedback */}
       {toastMessage && (

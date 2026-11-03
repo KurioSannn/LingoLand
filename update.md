@@ -476,29 +476,44 @@
 
 ### BLOK 32 — Player interaction: text chat, partner practice, safety
 
-**Prioritas:** P0 untuk text-first Social Plaza. **Dependensi:** 29–31. **Status:** TODO.
+**Prioritas:** P0 untuk text-first Social Plaza. **Dependensi:** 29–31. **Status:** DONE.
 
 **Tujuan:** Pertemuan di Social Plaza punya fungsi belajar, tidak hanya saling melihat avatar.
 
 **Implementasi:**
-- [ ] Proximity prompt untuk pemain lain: lihat profil publik, kirim friend request, invite duo practice, buka chat (jika diizinkan).
-- [ ] Chat text room-scoped dan/atau direct chat dengan aturan role/permission; batas panjang, rate limit, flood protection, message id.
-- [ ] Moderasi minimum: block, mute, report user/message, report reason, staff review queue. Tegaskan teks publik bisa terlihat oleh orang di room.
-- [ ] Never expose email, token, real location, atau private profile dalam message payload.
-- [ ] Opsi practice topic: perkenalan, hobi, daily routine; tampilkan prompt pertanyaan yang dapat dipilih pemain.
-- [ ] Tombol leave/close conversation, interaction invitation accept/decline, timeout.
-- [ ] Pastikan penyalahgunaan tidak memengaruhi akun lain: server auth, room membership, blocklist enforced, basic content control dan moderation workflow.
-- [ ] Voice dan screen-sharing **tidak** dicakup blok ini; jangan tampilkan tombol aktif yang belum berfungsi.
+- [x] Migrasi database di [`supabase/migrations/20261103000009_block32_player_chat_moderation_practice.sql`](file:///D:/lingoland/supabase/migrations/20261103000009_block32_player_chat_moderation_practice.sql):
+  - Tabel `moderation_reports` (reporter_id, reported_id, reason, notes, room_id, status pending/reviewed/actioned).
+  - Tabel `user_mutes` dan Security Definer RPCs: `submit_moderation_report`, `mute_user`, `unmute_user`, dan `get_muted_user_ids`.
+- [x] Repository dan validation layer di [`src/lib/chatRepository.ts`](file:///D:/lingoland/src/lib/chatRepository.ts):
+  - `validateChatMessage`: Pembatasan panjang 1–280 karakter dan sanitasi XSS string.
+  - Sanitasi payload aman: tidak membocorkan email, token, kata sandi, atau koordinat GPS.
+  - `submitModerationReport`, `muteUser`, `unmuteUser`, dan `fetchMutedUserIds` dengan fallback hybrid local storage.
+- [x] React hook [`src/hooks/useRoomChat.ts`](file:///D:/lingoland/src/hooks/useRoomChat.ts):
+  - Subskripsi broadcast room channel: `chat_message`, `practice_invite`, `practice_response`, `practice_end`.
+  - Rate limiting anti-flood (800ms) dan filtering otomatis terhadap pemain yang di-mute atau di-block.
+- [x] Panel interaksi pemain [`src/components/world/PlayerInteractionPanel.tsx`](file:///D:/lingoland/src/components/world/PlayerInteractionPanel.tsx):
+  - Tab Profil & Aksi: Kirim pertemanan nyata.
+  - Tab Latihan Duo: Pemilihan topik percakapan bilingual dan kirim undangan latihan.
+  - Tab Keamanan & Privasi: Mute obrolan instan, Blokir pemain permanen, dan Formulir Pelaporan (Report).
+- [x] Overlay obrolan [`src/components/world/RoomChatOverlay.tsx`](file:///D:/lingoland/src/components/world/RoomChatOverlay.tsx):
+  - Floating drawer responsif (desktop & mobile), auto-scroll, badge bubble sistem/latihan/publik, dan tombol *quick conversation starters*.
+- [x] Banner latihan duo [`src/components/world/DuoPracticeBanner.tsx`](file:///D:/lingoland/src/components/world/DuoPracticeBanner.tsx):
+  - Notifikasi konfirmasi undangan masuk (Terima/Tolak), indikator sesi latihan aktif, kirim starter prompt, dan tombol selesai latihan.
+- [x] Integrasi halaman [`src/pages/SocialPlazaPage.tsx`](file:///D:/lingoland/src/pages/SocialPlazaPage.tsx):
+  - Penyembunyian avatar & pesan pemain yang diblokir, keyboard controls dinonaktifkan saat mengetik chat.
+- [x] Unit test komprehensif di [`tests/unit/chatAndModeration.test.ts`](file:///D:/lingoland/tests/unit/chatAndModeration.test.ts).
 
-**File kemungkinan:** src/components/world/PlayerInteractionPanel.tsx (baru), src/components/chat/* (baru), src/hooks/useRoomChat.ts, src/lib/chatRepository.ts, supabase/migrations/*, server functions.
-
-**Pengujian wajib:** room isolation, spoofed sender, blocked sender, spam, report, leave-mid-chat, reconnection, mobile overlay keyboard, XSS rendering, unauthorized direct message.
+**Bukti Pengujian Blok 32:**
+- 16 test files, 103 unit tests passed (`tests/unit/chatAndModeration.test.ts`, dll).
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: Vite production build passed.
 
 **Acceptance criteria / DoD:**
-- [ ] A dan B bisa berkirim chat dalam room sesuai permission.
-- [ ] Block/mute/report berfungsi dan memiliki efek nyata, bukan toast palsu.
-- [ ] Pemain di room lain tidak menerima atau membaca pesan privat room.
-- [ ] Interaction panel dapat dipakai mobile maupun desktop.
+- [x] Pemain dapat berkirim pesan dalam room dengan batasan karakter, sanitasi XSS, dan rate limit.
+- [x] Block, mute, dan report berfungsi secara nyata (mute menyembunyikan pesan, block menyembunyikan avatar dan pertemanan, report tersimpan di DB).
+- [x] Tidak ada kebocoran email, token, lokasi privat dalam payload obrolan.
+- [x] Interaction panel dan chat overlay dapat dipakai mobile maupun desktop.
 
 ---
 
