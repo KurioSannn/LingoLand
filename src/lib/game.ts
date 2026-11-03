@@ -4,9 +4,9 @@ import type { DemoState, Mission } from "../types";
 export function normalizeSentence(input: string): string {
   return input
     .toLowerCase()
-    .trim()
     .replace(/[^\w\s]/g, " ")
-    .replace(/\s+/g, " ");
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function evaluateMissionInput(mission: Mission, input: string, completedObjectiveIds: string[]): string[] {
