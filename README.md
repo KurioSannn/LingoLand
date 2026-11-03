@@ -1,138 +1,91 @@
 # Lingoland
 
-Lingoland adalah prototype web untuk latihan speaking bahasa Inggris berbasis avatar dan virtual room. Fokus MVP-nya adalah alur yang bisa dimainkan dari awal sampai selesai: login demo, pilih misi, atur avatar, masuk Mini Home, mendekati NPC, ngobrol, lalu dapat XP dan koin yang tersimpan lokal.
-
-## Ringkasan Produk
+Lingoland adalah aplikasi web untuk latihan speaking bahasa Inggris berbasis avatar dan dunia virtual 3D. Pengguna belajar lewat lesson, mengumpulkan XP/koin, mengatur avatar, berlatih dengan NPC di **Mini Home**, dan bertemu pemain lain di **Social Plaza**.
 
 Tagline: **Berani Bicara, Satu Percakapan Sekaligus.**
 
-Lingoland membantu pengguna yang sudah paham teori bahasa Inggris tetapi masih takut berbicara, tidak punya partner latihan, atau ingin latihan dalam suasana yang lebih aman. Versi ini masih prototype, jadi NPC di room adalah simulasi, bukan pengguna real-time.
+## Mode penggunaan
 
-## Fitur yang Sudah Tersedia
+| Mode | Syarat | Perilaku |
+|---|---|---|
+| **Akun nyata** | `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` terisi | Auth Supabase, progres/koin/teman di database, multiplayer realtime |
+| **Tamu / demo** | env kosong atau tombol *Masuk sebagai Demo* | Progres di `localStorage` (`lingoland_demo_v1`), fitur sosial hanya simulasi |
 
-- Landing page interaktif.
-- Login demo dan tombol **Masuk sebagai Demo**.
-- Protected route untuk halaman aplikasi.
-- Dashboard utama dengan progress, friends preview, dan mission shortcut.
-- Learning mission selector.
-- Avatar customizer dengan penyimpanan ke `localStorage`.
-- Store demo dengan transaksi koin lokal.
-- Mini Home 3D dengan kontrol keyboard dan kontrol mobile.
-- NPC interaktif dengan proximity prompt.
-- Conversation panel dengan suggested sentence, text input, dan fallback speech recognition.
-- XP, level, koin, heart, dan progress lokal.
-- Reset progress demo.
+## Fitur
 
-## Fitur yang Belum Tersedia
+- Auth (register/login/lupa password), protected route, role admin (`/admin`).
+- Lesson & bank soal dinamis dengan grading di server; reward XP/koin lewat ledger.
+- Avatar customizer, store, inventory.
+- **Mini Home** (`/app/world`): ruang privat, NPC interaktif, misi, speech recognition opsional.
+- **Social Plaza** (`/app/plaza`): map 3D outdoor, pemain lain secara realtime, daftar room, papan topik.
+- Teman: request, terima/tolak, block, privasi presence.
+- Interaksi pemain: chat room, undangan latihan duo, mute/block/report.
+- Admin: CMS kurikulum + audit log.
 
-- Multiplayer real-time.
-- WebRTC antar pengguna.
-- Backend production.
-- Database production.
-- Payment gateway.
-- AI pronunciation scoring.
-- Voice room real-time.
+## Belum tersedia
 
-## Demo Account
+- Voice room / WebRTC, AI pronunciation scoring, payment gateway nyata.
+- Feature flag di kode, suspend akun dari UI, persistensi chat (lihat `CHANGELOG.md` → Known limitations).
 
-```text
-Email: demo@lingoland.app
-Password: Demo123!
-```
-
-Tersedia juga tombol cepat:
-
-- Masuk sebagai Demo
-
-## Cara Menjalankan Project
-
-Project ini memakai **npm**.
+## Menjalankan
 
 ```bash
 npm install
+cp .env.example .env   # opsional; tanpa ini app berjalan mode demo
 npm run dev
 ```
 
-Script yang tersedia:
+Script: `dev`, `build`, `lint`, `typecheck`, `test` (vitest), `test:watch`.
 
-- `npm run dev` untuk menjalankan Vite dev server.
-- `npm run build` untuk build produksi.
-- `npm run lint` untuk menjalankan ESLint.
-- `npm run typecheck` untuk TypeScript check.
-- `npm run test` untuk menjalankan typecheck dalam mode test script saat ini.
-
-## Verifikasi
-
-Minimal yang disarankan:
+Verifikasi sebelum merge:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test
-npm run build
+npm run lint && npm run typecheck && npm run test && npm run build
 ```
 
-## Cara Reset Progress Demo
+CI GitHub Actions menjalankan urutan yang sama pada push/PR ke `main`.
 
-Masuk ke aplikasi, buka menu profil, lalu pilih **Reset Progress Demo**. Reset akan mengembalikan:
+## Database
 
-- XP
-- koin
-- level
-- mission progress
-- avatar
-- inventory
-- streak
-- state room saat ini
+Migrasi di `supabase/migrations/` (urutan wajib, lihat `docs/DEPLOYMENT.md`):
 
-## Penyimpanan Lokal
+```bash
+supabase link --project-ref <ref>
+supabase db push
+```
 
-Progress demo disimpan di browser menggunakan `localStorage` dengan key `lingoland_demo_v1`.
+Akun demo lokal: `demo@lingoland.app` / `Demo123!` (hanya simulasi lokal, bukan akun server).
 
-Data yang disimpan:
+## Dokumentasi
 
-- sesi demo lokal
-- progress user
-- avatar config
-- inventory
-- completed mission
-- claimed rewards
+| Dokumen | Isi |
+|---|---|
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | env, migrasi, Vercel, smoke test, rollout |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | arsitektur, rute, ERD, batasan |
+| [docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md) | checklist rilis/QA |
+| [docs/ADMIN_ONBOARDING.md](docs/ADMIN_ONBOARDING.md) | role admin, CMS, laporan |
+| [docs/SOP_MODERATION.md](docs/SOP_MODERATION.md) | moderasi, pemulihan akun, retensi |
+| [docs/ROLLBACK.md](docs/ROLLBACK.md) | rollback, disable fitur, kembali ke mode demo |
+| [CHANGELOG.md](CHANGELOG.md) | riwayat perubahan & known limitations |
+| `PRD.md`, `update.md` | produk & roadmap blok |
 
-Data sementara seperti state modal atau loading tidak disimpan.
+## Keamanan
 
-## Virtual Room
+- Hanya anon/publishable key di frontend. **Jangan** memakai `service_role` di `VITE_*`.
+- Secret Edge Function (mis. `GEMINI_API_KEY`) diset via `supabase secrets set`.
+- `.env` di-ignore oleh git.
 
-Mini Home adalah satu ruang virtual low-poly yang dapat dijelajahi. Player bisa bergerak dengan keyboard di desktop, atau joystick virtual di mobile. Saat mendekati NPC, prompt interaksi muncul dan conversation panel bisa dibuka.
-
-## Speech Recognition
-
-Fitur mikrofon bersifat opsional. Jika browser mendukung Web Speech API, hasil transkrip bisa masuk ke input teks. Jika tidak didukung, user tetap bisa menyelesaikan misi lewat teks.
-
-## Browser Recommendation
-
-Gunakan browser modern yang mendukung WebGL. Jika WebGL tidak tersedia, room akan menampilkan fallback yang menjelaskan keterbatasan tersebut.
-
-## Local Project Structure
+## Struktur
 
 ```text
 src/
-  components/
-    layout/
-    missions/
-    navigation/
-    three/
-    ui/
-    world/
-  data/
-  hooks/
-  lib/
-  pages/
-  state/
+  components/ (layout, missions, navigation, three, ui, world)
+  data/  hooks/  lib/ (realtime/, repositories)  pages/ (admin/)  state/
+supabase/ (migrations/, functions/avatar-chat)
+tests/unit/
+docs/
 ```
 
-## Catatan Penting
+## Browser
 
-- Ini adalah prototype interaksi, bukan produk produksi.
-- Karakter lain dalam versi demo merupakan simulasi.
-- Multiplayer belum tersedia.
-- Login demo hanya simulasi lokal dan tidak aman untuk production.
+Gunakan browser modern dengan WebGL. Tanpa WebGL, scene menampilkan fallback.

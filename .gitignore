@@ -8,3 +8,5 @@ dist/
 !PRD.md
 !update.md
 .vscode/
+!CHANGELOG.md
+!docs/*.md

@@ -564,27 +564,27 @@
 
 ### BLOK 34 — Deployment, migration rollout, docs, release gate
 
-**Prioritas:** P0. **Dependensi:** 33. **Status:** TODO.
+**Prioritas:** P0. **Dependensi:** 33. **Status:** DOCS DONE — operasional staging/prod masih perlu dijalankan manual.
 
 **Tujuan:** Release berulang tanpa kehilangan data atau membuat staging/production tercampur.
 
 **Implementasi:**
-- [ ] Pisahkan konfigurasi Supabase dev/staging/prod dan Vercel preview/production; tidak membagikan production DB untuk automated tests.
-- [ ] Terapkan migration berurutan, backup/restore rehearsal dan rollback strategy (untuk destructive SQL perlu forward-fix/backup plan, bukan jaminan rollback otomatis).
-- [ ] Deploy Edge Functions yang aktif dengan version dan secret aman; jangan pasang secret backend ke VITE_*.
-- [ ] Feature flags: auth umum, dynamic lessons, admin, social lobby, Plaza, chat. Default OFF di prod sampai verified.
-- [ ] Perbarui README.md, PRD.md (scope perubahan post-MVP), deployment docs, architecture/ERD, QA checklist, admin onboarding, dan changelog.
-- [ ] Periksa deep-link /admin, /app/plaza dengan Vercel SPA rewrite yang sudah ada.
-- [ ] Gunakan staged rollout internal -> tester -> publik; pantau auth errors, write failure, reward anomalies, realtime usage.
-- [ ] Dokumentasikan cara kembali ke mode demo stabil jika produksi gagal, tanpa menghapus data akun.
-- [ ] Sediakan SOP moderasi, abuse report, pemulihan akun, serta retensi dan penghapusan data sesuai kebijakan produk.
+- [x] Pisahkan konfigurasi dev/staging/prod — didokumentasikan di [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) §1–2 (eksekusi setup project = manual/owner; user menyatakan deploy sudah berjalan).
+- [x] Urutan migrasi, backup/restore & strategi forward-fix — `docs/DEPLOYMENT.md` §3, `docs/ROLLBACK.md` §4.
+- [x] Edge Function & secret aman — `docs/DEPLOYMENT.md` §2, §4.
+- [ ] Feature flags — **belum diimplementasikan di kode**; hanya didokumentasikan mekanisme disable manual (`docs/DEPLOYMENT.md` §8). Backlog.
+- [x] README.md diperbarui; [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (ERD), [`docs/QA_CHECKLIST.md`](docs/QA_CHECKLIST.md), [`docs/ADMIN_ONBOARDING.md`](docs/ADMIN_ONBOARDING.md), [`CHANGELOG.md`](CHANGELOG.md) dibuat. PRD.md belum diubah.
+- [x] Deep-link `/admin`, `/app/plaza` — `vercel.json` SPA rewrite sudah ada; langkah verifikasi di QA checklist §F.
+- [x] Panduan staged rollout & metrik pantau — `docs/DEPLOYMENT.md` §7.
+- [x] Kembali ke mode demo tanpa menghapus data — [`docs/ROLLBACK.md`](docs/ROLLBACK.md) §3.
+- [x] SOP moderasi, abuse report, pemulihan akun, retensi — [`docs/SOP_MODERATION.md`](docs/SOP_MODERATION.md) (kontak/PIC belum ditetapkan).
 
 **Acceptance criteria / DoD:**
-- [ ] Staging E2E hijau dengan migrasi dari DB bersih.
-- [ ] Tidak ada key rahasia di repo/frontend.
-- [ ] Dokumentasi matches app yang benar-benar di-deploy.
-- [ ] Checklist release dan rollback/disable feature bisa dilaksanakan.
-- [ ] Pengujian ulang rute lama dan produk baru selesai.
+- [ ] Staging E2E hijau dengan migrasi dari DB bersih — **belum dijalankan/terverifikasi** (gunakan QA checklist).
+- [x] Tidak ada key rahasia di repo/frontend (`.env` ter-ignore; hanya anon key; `service_role` tidak dipakai di `src/`).
+- [ ] Dokumentasi matches app yang di-deploy — perlu dicocokkan oleh pemilik deploy.
+- [x] Checklist release dan rollback/disable feature tersedia dan dapat dilaksanakan.
+- [ ] Pengujian ulang rute lama dan produk baru — manual di staging (QA checklist).
 
 ---
 
