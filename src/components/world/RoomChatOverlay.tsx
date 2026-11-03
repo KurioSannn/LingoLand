@@ -155,12 +155,22 @@ export function RoomChatOverlay({
                     <div
                       className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed shadow-sm ${
                         isMe
-                          ? "bg-primary-600 text-white rounded-br-xs"
+                          ? msg.status === "failed"
+                            ? "bg-danger-600 text-white rounded-br-xs"
+                            : "bg-primary-600 text-white rounded-br-xs"
                           : "bg-neutral-100 text-neutral-900 rounded-bl-xs"
                       }`}
                     >
                       {msg.message}
                     </div>
+                    {isMe && msg.status === "pending" && (
+                      <span className="mt-0.5 text-[10px] text-neutral-400">Mengirim...</span>
+                    )}
+                    {isMe && msg.status === "failed" && (
+                      <span className="mt-0.5 text-[10px] font-semibold text-danger-600">
+                        Gagal terkirim
+                      </span>
+                    )}
                   </div>
                 );
               })

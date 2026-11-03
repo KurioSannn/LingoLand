@@ -9,6 +9,7 @@ import {
   validateChatMessage,
 } from "../lib/chatRepository";
 import type { ConversationTopic } from "../lib/plazaWorld";
+import type { PlayerPresence } from "../lib/realtime/protocol";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 
 export const CHAT_RATE_LIMIT_MS = 800;
@@ -22,12 +23,14 @@ interface UseRoomChatParams {
     isGuest?: boolean;
   };
   enabled?: boolean;
+  verifiedPresences?: Map<string, { presence: PlayerPresence }>;
 }
 
 export function useRoomChat({
   roomId,
   currentUser,
   enabled = true,
+  verifiedPresences,
 }: UseRoomChatParams) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [mutedUserIds, setMutedUserIds] = useState<string[]>([]);
@@ -37,8 +40,11 @@ export function useRoomChat({
   const lastSendTimeRef = useRef(0);
   const mutedUserIdsRef = useRef<string[]>([]);
   mutedUserIdsRef.current = mutedUserIds;
+  const verifiedPresencesRef = useRef(verifiedPresences);
+  verifiedPresencesRef.current = verifiedPresences;
 
   const channelRef = useRef<ReturnType<NonNullable<typeof supabase>["channel"]> | null>(null);
+  const isSubscribedRef = useRef(false);
 
   // Load muted list on mount / user change
   useEffect(() => {
@@ -49,12 +55,21 @@ export function useRoomChat({
     initMutes();
   }, [currentUser.isGuest]);
 
-  // Setup channel listeners
+  // Setup channel listeners with deterministic cleanup on room switch or unmount
   useEffect(() => {
-    if (!enabled || !roomId) return;
+    setPendingInvite(null);
+    setActivePractice(null);
+    isSubscribedRef.current = false;
+
+    if (!enabled || !roomId) {
+      if (channelRef.current && supabase) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      return;
+    }
 
     if (!isSupabaseConfigured || !supabase || currentUser.isGuest) {
-      // Mock system welcome for guest / isolated offline
       setMessages([
         {
           id: "welcome-system",
@@ -66,42 +81,93 @@ export function useRoomChat({
             "Selamat datang di Social Plaza! Gunakan chat ini untuk menyapa dan berlatih bahasa Inggris bersama.",
           timestamp: Date.now(),
           type: "system",
+          status: "sent",
         },
       ]);
       return;
     }
 
-    const channelName = `room:${roomId}`;
-    const channel = supabase.channel(channelName);
+    let cancelled = false;
+    setMessages([]);
+
+    const channelName = `room-chat:${roomId}`;
+    const channel = supabase.channel(channelName, {
+      config: {
+        broadcast: { self: false, ack: true },
+      },
+    });
     channelRef.current = channel;
 
     // 1. Chat Message Broadcast
     channel.on("broadcast", { event: "chat_message" }, ({ payload }) => {
-      const msg = payload as ChatMessage;
-      if (!msg || !msg.senderId) return;
+      if (cancelled) return;
+      const msg = payload as Partial<ChatMessage>;
+      if (
+        !msg ||
+        typeof msg.id !== "string" ||
+        typeof msg.senderId !== "string" ||
+        !msg.senderId ||
+        msg.senderId === currentUser.id ||
+        msg.roomId !== roomId ||
+        typeof msg.message !== "string"
+      ) {
+        return;
+      }
 
       // Filter out muted players
       if (mutedUserIdsRef.current.includes(msg.senderId)) {
         return;
       }
 
-      setMessages((prev) => [...prev, msg]);
+      // Validate and sanitize incoming message content
+      const check = validateChatMessage(msg.message);
+      if (!check.ok) return;
+
+      // Cross-check sender identity against verified room presence when available
+      const verified = verifiedPresencesRef.current?.get(msg.senderId)?.presence;
+      const safeSenderName = verified?.name || msg.senderName || "Pemain";
+      const safeSenderUsername = verified?.username || msg.senderUsername || "player";
+
+      const incomingMessage: ChatMessage = {
+        id: msg.id,
+        roomId,
+        senderId: msg.senderId,
+        senderName: safeSenderName,
+        senderUsername: safeSenderUsername,
+        message: check.sanitized,
+        timestamp: typeof msg.timestamp === "number" ? msg.timestamp : Date.now(),
+        type: msg.type === "practice" ? "practice" : "room",
+        status: "sent",
+      };
+
+      setMessages((prev) => {
+        if (prev.some((existing) => existing.id === incomingMessage.id)) {
+          return prev;
+        }
+        return [...prev, incomingMessage];
+      });
     });
 
     // 2. Practice Invite Broadcast
     channel.on("broadcast", { event: "practice_invite" }, ({ payload }) => {
+      if (cancelled) return;
       const invite = payload as PracticeInvite;
-      if (!invite || invite.targetId !== currentUser.id) return;
+      if (!invite || invite.roomId !== roomId || invite.targetId !== currentUser.id) return;
 
       if (mutedUserIdsRef.current.includes(invite.senderId)) {
         return;
       }
 
-      setPendingInvite(invite);
+      const verified = verifiedPresencesRef.current?.get(invite.senderId)?.presence;
+      setPendingInvite({
+        ...invite,
+        senderName: verified?.name || invite.senderName || "Pemain",
+      });
     });
 
     // 3. Practice Response Broadcast
     channel.on("broadcast", { event: "practice_response" }, ({ payload }) => {
+      if (cancelled) return;
       const res = payload as {
         inviteId: string;
         senderId: string;
@@ -111,13 +177,16 @@ export function useRoomChat({
         topic: ConversationTopic;
       };
 
-      if (res.targetId !== currentUser.id) return;
+      if (!res || res.targetId !== currentUser.id) return;
+
+      const verified = verifiedPresencesRef.current?.get(res.senderId)?.presence;
+      const responderName = verified?.name || res.senderName || "Pemain";
 
       if (res.accepted) {
         setActivePractice({
           id: res.inviteId,
           partnerId: res.senderId,
-          partnerName: res.senderName,
+          partnerName: responderName,
           topicId: res.topic.id,
           topicTitle: res.topic.title,
           starterEn: res.topic.starterEn,
@@ -134,9 +203,10 @@ export function useRoomChat({
             senderId: "system",
             senderName: "Sistem",
             senderUsername: "system",
-            message: `${res.senderName} menerima undangan latihan! Topik: ${res.topic.title}`,
+            message: `${responderName} menerima undangan latihan! Topik: ${res.topic.title}`,
             timestamp: Date.now(),
             type: "system",
+            status: "sent",
           },
         ]);
       } else {
@@ -148,9 +218,10 @@ export function useRoomChat({
             senderId: "system",
             senderName: "Sistem",
             senderUsername: "system",
-            message: `${res.senderName} sedang belum bisa bergabung latihan saat ini.`,
+            message: `${responderName} sedang belum bisa bergabung latihan saat ini.`,
             timestamp: Date.now(),
             type: "system",
+            status: "sent",
           },
         ]);
       }
@@ -158,7 +229,9 @@ export function useRoomChat({
 
     // 4. Practice End Broadcast
     channel.on("broadcast", { event: "practice_end" }, ({ payload }) => {
-      const { partnerId } = payload as { partnerId: string };
+      if (cancelled) return;
+      const { partnerId } = (payload as { partnerId?: string }) ?? {};
+      if (!partnerId) return;
       setActivePractice((current) => {
         if (current && current.partnerId === partnerId) {
           return null;
@@ -167,16 +240,31 @@ export function useRoomChat({
       });
     });
 
-    channel.subscribe();
+    channel.subscribe((status) => {
+      if (cancelled) return;
+      isSubscribedRef.current = status === "SUBSCRIBED";
+    });
 
     return () => {
-      // Channel will be cleaned up by parent or unmount
+      cancelled = true;
+      isSubscribedRef.current = false;
+      if (channelRef.current && supabase) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [enabled, roomId, currentUser.id, currentUser.isGuest]);
 
-  // Send Chat Message
+  // Send Chat Message with optimistic pending -> sent/failed status tracking
   const sendMessage = useCallback(
     (text: string, type: "room" | "practice" = "room"): { ok: boolean; error?: string } => {
+      if (!enabled) {
+        return {
+          ok: false,
+          error: "Obrolan belum aktif karena belum bergabung ke dalam room.",
+        };
+      }
+
       const now = Date.now();
       if (now - lastSendTimeRef.current < CHAT_RATE_LIMIT_MS) {
         return {
@@ -191,38 +279,64 @@ export function useRoomChat({
       }
 
       lastSendTimeRef.current = now;
+      const isOfflineOrGuest = !isSupabaseConfigured || !supabase || Boolean(currentUser.isGuest);
+      const messageId = `msg-${now}-${Math.random().toString(36).substring(2, 7)}`;
 
       const payload: ChatMessage = {
-        id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        id: messageId,
         roomId,
         senderId: currentUser.id,
         senderName: currentUser.name,
-        senderUsername: currentUser.username || currentUser.name.toLowerCase().replace(/\s+/g, "_"),
+        senderUsername:
+          currentUser.username || currentUser.name.toLowerCase().replace(/\s+/g, "_"),
         message: validation.sanitized,
         timestamp: now,
         type,
+        status: isOfflineOrGuest ? "sent" : "pending",
       };
 
-      // Optimistic append to local messages
       setMessages((prev) => [...prev, payload]);
 
-      // Broadcast over channel if online
-      if (channelRef.current && !currentUser.isGuest) {
-        channelRef.current.send({
-          type: "broadcast",
-          event: "chat_message",
-          payload,
-        });
+      if (!isOfflineOrGuest) {
+        const channel = channelRef.current;
+        if (!channel) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === messageId ? { ...m, status: "failed" } : m)),
+          );
+          return { ok: false, error: "Channel obrolan belum siap." };
+        }
+
+        Promise.resolve(
+          channel.send({
+            type: "broadcast",
+            event: "chat_message",
+            payload: { ...payload, status: "sent" },
+          }),
+        )
+          .then((sendResult) => {
+            const ok = !sendResult || sendResult === "ok";
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === messageId ? { ...m, status: ok ? "sent" : "failed" } : m,
+              ),
+            );
+          })
+          .catch(() => {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === messageId ? { ...m, status: "failed" } : m)),
+            );
+          });
       }
 
       return { ok: true };
     },
-    [roomId, currentUser],
+    [enabled, roomId, currentUser],
   );
 
   // Send Practice Invite
   const sendPracticeInvite = useCallback(
     (targetId: string, topic: ConversationTopic) => {
+      if (!enabled) return;
       const invite: PracticeInvite = {
         id: `invite-${Date.now()}`,
         roomId,
@@ -255,10 +369,11 @@ export function useRoomChat({
           message: `Undangan latihan dengan topik "${topic.title}" telah terkirim.`,
           timestamp: Date.now(),
           type: "system",
+          status: "sent",
         },
       ]);
     },
-    [roomId, currentUser],
+    [enabled, roomId, currentUser],
   );
 
   // Respond Practice Invite
@@ -327,6 +442,7 @@ export function useRoomChat({
         message: "Sesi latihan duo telah selesai.",
         timestamp: Date.now(),
         type: "system",
+        status: "sent",
       },
     ]);
   }, [activePractice, roomId, currentUser.id, currentUser.isGuest]);

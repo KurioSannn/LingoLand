@@ -8,6 +8,9 @@ export const MOVEMENT_RATE_LIMIT_MS = 100;
 /** Jarak lompatan maksimum yang diizinkan per paket movement (teleport clamp) */
 export const MAX_TELEPORT_DISTANCE = 4.0;
 
+/** Batas koordinat absolut dunia 3D untuk mencegah injeksi koordinat ekstrem */
+export const MAX_WORLD_COORDINATE = 50.0;
+
 /** Interval detak jantung (heartbeat) room */
 export const HEARTBEAT_INTERVAL_MS = 15000;
 
@@ -36,23 +39,41 @@ export interface PlayerPresence {
   joinedAt: number;
 }
 
-export function isValidMovementPayload(payload: unknown): payload is MovementPayload {
+export function isValidMovementPayload(
+  payload: unknown,
+  expectedRoomId?: string,
+): payload is MovementPayload {
   if (!payload || typeof payload !== "object") return false;
   const p = payload as Partial<MovementPayload>;
 
+  if (
+    typeof p.playerId !== "string" ||
+    p.playerId.trim().length === 0 ||
+    typeof p.roomId !== "string" ||
+    p.roomId.trim().length === 0
+  ) {
+    return false;
+  }
+
+  if (expectedRoomId && p.roomId !== expectedRoomId) {
+    return false;
+  }
+
   return (
-    typeof p.playerId === "string" &&
-    p.playerId.length > 0 &&
-    typeof p.roomId === "string" &&
     typeof p.x === "number" &&
-    !Number.isNaN(p.x) &&
+    Number.isFinite(p.x) &&
+    Math.abs(p.x) <= MAX_WORLD_COORDINATE &&
     typeof p.z === "number" &&
-    !Number.isNaN(p.z) &&
+    Number.isFinite(p.z) &&
+    Math.abs(p.z) <= MAX_WORLD_COORDINATE &&
     typeof p.rotation === "number" &&
-    !Number.isNaN(p.rotation) &&
+    Number.isFinite(p.rotation) &&
     (p.animState === "idle" || p.animState === "walk") &&
     typeof p.seq === "number" &&
+    Number.isFinite(p.seq) &&
+    p.seq >= 1 &&
     typeof p.timestamp === "number" &&
+    Number.isFinite(p.timestamp) &&
     p.version === PROTOCOL_VERSION
   );
 }
@@ -86,7 +107,6 @@ export function clampMovement(
  * Abaikan paket yang datang terlambat (stale / out-of-order packet).
  */
 export function isSequenceFresher(newSeq: number, lastSeq: number): boolean {
-  // Tangani kemungkinan overflow atau sequence reset setelah disconnected
   if (lastSeq === 0) return true;
   return newSeq > lastSeq;
 }

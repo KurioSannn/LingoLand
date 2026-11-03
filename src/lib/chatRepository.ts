@@ -7,6 +7,8 @@ export type ModerationReason =
   | "hate_speech"
   | "other";
 
+export type ChatDeliveryStatus = "pending" | "sent" | "failed";
+
 export interface ChatMessage {
   id: string;
   roomId: string;
@@ -16,6 +18,7 @@ export interface ChatMessage {
   message: string;
   timestamp: number;
   type: "room" | "system" | "practice";
+  status?: ChatDeliveryStatus;
 }
 
 export interface PracticeInvite {

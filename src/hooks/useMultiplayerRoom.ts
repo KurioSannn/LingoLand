@@ -38,10 +38,12 @@ export function useMultiplayerRoom({
   isGuest = false,
 }: UseMultiplayerRoomParams) {
   const [isConnected, setIsConnected] = useState(false);
+  const [joinDenied, setJoinDenied] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [remotePlayers, setRemotePlayers] = useState<Map<string, RemotePlayerState>>(new Map());
 
   const channelRef = useRef<ReturnType<NonNullable<typeof supabase>["channel"]> | null>(null);
+  const joinedServerRoomRef = useRef(false);
   const lastBroadcastTimeRef = useRef(0);
   const seqCounterRef = useRef(1);
   const remotePlayersRef = useRef<Map<string, RemotePlayerState>>(new Map());
@@ -49,7 +51,7 @@ export function useMultiplayerRoom({
 
   // Cleanup timeout interval
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !isConnected) return;
     const interval = setInterval(() => {
       const now = Date.now();
       let changed = false;
@@ -68,26 +70,51 @@ export function useMultiplayerRoom({
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [enabled]);
+  }, [enabled, isConnected]);
 
   // Join & subscribe lifecycle
   useEffect(() => {
-    if (!enabled || !roomId) return;
+    if (!enabled || !roomId) {
+      setIsConnected(false);
+      return;
+    }
 
     let cancelled = false;
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+    joinedServerRoomRef.current = false;
 
     async function initRoom() {
       try {
         setConnectionError(null);
-        await joinWorldRoom(roomId, inviteCode, isGuest);
+        setJoinDenied(false);
+        setIsConnected(false);
+        setRemotePlayers(new Map());
+
+        const joinRes = await joinWorldRoom(roomId, inviteCode, isGuest);
 
         if (cancelled) return;
+
+        // Enforce server join result: NEVER subscribe, track presence, or broadcast
+        // if join_world_room rejected the request (room full, invalid invite, not friend, etc.)
+        if (!joinRes.ok) {
+          setIsConnected(false);
+          setJoinDenied(true);
+          setConnectionError(joinRes.message || "Gagal bergabung ke room.");
+          return;
+        }
+
+        joinedServerRoomRef.current = true;
 
         // If guest or no supabase, mark connected in offline/isolated mode
         if (!isSupabaseConfigured || !supabase || isGuest) {
           setIsConnected(true);
           return;
         }
+
+        // Start heartbeat loop only after server join succeeded
+        heartbeatTimer = setInterval(() => {
+          sendRoomHeartbeat(roomId, isGuest);
+        }, 15000);
 
         const channelName = `room:${roomId}`;
         const channel = supabase.channel(channelName, {
@@ -107,7 +134,7 @@ export function useMultiplayerRoom({
             for (const [key, presences] of Object.entries(presenceState)) {
               if (key === playerProfile.playerId) continue; // Exclude self
               const latest = presences[presences.length - 1] as unknown as PlayerPresence;
-              if (latest && latest.playerId) {
+              if (latest && latest.playerId && latest.playerId === key) {
                 const existing = remotePlayersRef.current.get(latest.playerId);
                 nextMap.set(latest.playerId, {
                   presence: latest,
@@ -128,9 +155,9 @@ export function useMultiplayerRoom({
             });
           });
 
-        // 2. Broadcast Movement Listener
+        // 2. Broadcast Movement Listener (strictly validated against roomId & bounds)
         channel.on("broadcast", { event: "movement" }, ({ payload }) => {
-          if (!isValidMovementPayload(payload)) return;
+          if (!isValidMovementPayload(payload, roomId)) return;
           if (payload.playerId === playerProfile.playerId) return;
 
           const existing = remotePlayersRef.current.get(payload.playerId);
@@ -164,7 +191,6 @@ export function useMultiplayerRoom({
                 lastSeen: Date.now(),
               });
             } else {
-              // Create provisional entry if presence didn't land first
               next.set(payload.playerId, {
                 presence: {
                   playerId: payload.playerId,
@@ -191,15 +217,19 @@ export function useMultiplayerRoom({
 
         // 3. Subscribe & Track Presence
         channel.subscribe(async (status) => {
+          if (cancelled) return;
           if (status === "SUBSCRIBED") {
             setIsConnected(true);
             await channel.track(playerProfile);
-          } else if (status === "CHANNEL_ERROR") {
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            setIsConnected(false);
             setConnectionError("Gagal terhubung ke channel realtime room.");
           }
         });
       } catch (err) {
         if (!cancelled) {
+          setIsConnected(false);
+          setJoinDenied(true);
           setConnectionError(err instanceof Error ? err.message : "Gagal inisialisasi room.");
         }
       }
@@ -207,20 +237,20 @@ export function useMultiplayerRoom({
 
     initRoom();
 
-    // Heartbeat loop every 15s
-    const heartbeatTimer = setInterval(() => {
-      sendRoomHeartbeat(roomId, isGuest);
-    }, 15000);
-
     return () => {
       cancelled = true;
-      clearInterval(heartbeatTimer);
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+      }
       if (channelRef.current && supabase) {
         channelRef.current.untrack();
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
-      leaveWorldRoom(roomId, isGuest);
+      if (joinedServerRoomRef.current) {
+        leaveWorldRoom(roomId, isGuest);
+        joinedServerRoomRef.current = false;
+      }
       setIsConnected(false);
     };
   }, [roomId, inviteCode, enabled, isGuest, playerProfile]);
@@ -228,7 +258,7 @@ export function useMultiplayerRoom({
   // Broadcast throttled movement to room channel
   const broadcastMovement = useCallback(
     (pos: { x: number; z: number; rotation: number; animState: "idle" | "walk" }) => {
-      if (!isConnected || isGuest || !channelRef.current) return;
+      if (!isConnected || joinDenied || isGuest || !channelRef.current) return;
 
       const now = Date.now();
       if (now - lastBroadcastTimeRef.current < MOVEMENT_RATE_LIMIT_MS) {
@@ -254,11 +284,12 @@ export function useMultiplayerRoom({
         payload,
       });
     },
-    [isConnected, isGuest, roomId, playerProfile.playerId],
+    [isConnected, joinDenied, isGuest, roomId, playerProfile.playerId],
   );
 
   return {
     isConnected,
+    joinDenied,
     connectionError,
     remotePlayers,
     broadcastMovement,

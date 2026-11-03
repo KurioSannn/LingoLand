@@ -130,7 +130,7 @@ export function SocialPlazaPage() {
   }, [currentUser, state.avatar]);
 
   // Hook Multiplayer Room (Presence & Movement)
-  const { isConnected, connectionError, remotePlayers, broadcastMovement } =
+  const { isConnected, joinDenied, connectionError, remotePlayers, broadcastMovement } =
     useMultiplayerRoom({
       roomId: activeRoomId,
       playerProfile,
@@ -153,7 +153,8 @@ export function SocialPlazaPage() {
   } = useRoomChat({
     roomId: activeRoomId,
     currentUser,
-    enabled: guidelinesAccepted && webglOk && !sceneError,
+    enabled: guidelinesAccepted && webglOk && !sceneError && !joinDenied,
+    verifiedPresences: remotePlayers,
   });
 
   // Filter out blocked players from 3D scene and list
