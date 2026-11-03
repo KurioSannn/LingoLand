@@ -85,15 +85,14 @@ export function AvatarChatPage() {
             <p className="form-help error w-full text-left">Text-to-speech belum didukung browser ini. Balasan tetap muncul dalam bentuk teks.</p>
           ) : null}
           <div className="w-full rounded-md bg-primary-50 p-4 text-left text-sm text-primary-600">
-            Fitur ini ditenagai oleh Gemini AI lewat Supabase Edge Function. Backend proxy-nya sudah disiapkan di{" "}
-            <code className="rounded bg-white px-1 py-0.5 text-xs">supabase/functions/avatar-chat</code>, tinggal menunggu Gemini API key dipasang supaya beneran aktif.
+            Gunakan kolom percakapan di samping untuk melatih kosa kata dan kelancaran berbahasa Inggris bersama avatarmu.
           </div>
         </Card>
 
         <Card className="flex flex-col gap-4">
           <div>
             <h2 className="text-lg font-bold text-neutral-950">Percakapan</h2>
-            <p className="mt-1 text-sm text-neutral-500">Karakter lain dalam versi demo merupakan simulasi.</p>
+            <p className="mt-1 text-sm text-neutral-500">Ketik pesan dalam bahasa Inggris untuk memulai percakapan.</p>
           </div>
 
           <div className="flex min-h-[320px] flex-1 flex-col gap-3 overflow-y-auto rounded-md bg-neutral-50 p-4" aria-live="polite">

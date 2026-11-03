@@ -1,5 +1,5 @@
 import { createInitialState, missions, STORAGE_KEY } from "../data/demoData";
-import type { DemoState, DemoStorageMeta, MissionProgress, MissionStatus } from "../types";
+import type { DemoState, DemoStorageMeta, MissionProgress, MissionStatus, UserRole } from "../types";
 
 interface DemoStorageLoadResult {
   state: DemoState;
@@ -7,6 +7,7 @@ interface DemoStorageLoadResult {
 }
 
 const missionStatuses: MissionStatus[] = ["locked", "available", "active", "completed", "incomplete"];
+const validRoles: UserRole[] = ["user", "moderator", "admin"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -45,7 +46,7 @@ function sanitizeMissionProgress(value: unknown, fallback: Record<string, Missio
     progress[mission.id] = {
       completedObjectiveIds: stringArray(raw.completedObjectiveIds, fallbackItem.completedObjectiveIds),
       status: typeof rawStatus === "string" && missionStatuses.includes(rawStatus as MissionStatus)
-        ? rawStatus as MissionStatus
+        ? (rawStatus as MissionStatus)
         : fallbackItem.status,
     };
     return progress;
@@ -59,19 +60,34 @@ export function hydrateDemoState(value: unknown): DemoState | null {
   const rawUser = isRecord(value.user) ? value.user : {};
   const rawAvatar = isRecord(value.avatar) ? value.avatar : {};
 
+  const rawName = stringValue(rawUser.name, fallback.user.name);
+  const rawUsername = stringValue(rawUser.username, fallback.user.username);
+  const rawEmail = stringValue(rawUser.email, fallback.user.email);
+  const rawRole = typeof rawUser.role === "string" && validRoles.includes(rawUser.role as UserRole)
+    ? (rawUser.role as UserRole)
+    : undefined;
+  const isGuest = booleanValue(value.isGuest, Boolean(rawUser.isGuest));
+
+  const cleanName = rawName === "Raka Demo" ? fallback.user.name : rawName;
+  const cleanUsername = rawUsername === "raka.demo" ? fallback.user.username : rawUsername;
+  const cleanEmail = rawEmail === "demo@lingoland.app" ? fallback.user.email : rawEmail;
+
   return {
     schemaVersion: 1,
     isAuthenticated: booleanValue(value.isAuthenticated, fallback.isAuthenticated),
+    isGuest,
     user: {
       id: stringValue(rawUser.id, fallback.user.id),
-      name: stringValue(rawUser.name, fallback.user.name),
-      username: stringValue(rawUser.username, fallback.user.username),
-      email: stringValue(rawUser.email, fallback.user.email),
+      name: cleanName,
+      username: cleanUsername,
+      email: cleanEmail,
       level: numberValue(rawUser.level, fallback.user.level),
       xp: numberValue(rawUser.xp, fallback.user.xp),
       coins: numberValue(rawUser.coins, fallback.user.coins),
       hearts: numberValue(rawUser.hearts, fallback.user.hearts),
       streakDays: numberValue(rawUser.streakDays, fallback.user.streakDays),
+      isGuest,
+      ...(rawRole ? { role: rawRole } : {}),
     },
     avatar: {
       skinToneId: stringValue(rawAvatar.skinToneId, fallback.avatar.skinToneId),
@@ -95,6 +111,9 @@ export function hydrateDemoState(value: unknown): DemoState | null {
 
 export function loadDemoState(): DemoStorageLoadResult {
   try {
+    // Bersihkan cache state versi demo lama agar tidak menimpa sesi pengguna
+    localStorage.removeItem("lingoland_demo_v1");
+
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       return {
@@ -102,7 +121,7 @@ export function loadDemoState(): DemoStorageLoadResult {
         meta: {
           key: STORAGE_KEY,
           status: "initialized",
-          message: "State demo baru dibuat dari data default.",
+          message: "Data progres baru telah disiapkan.",
         },
       };
     }
@@ -114,7 +133,7 @@ export function loadDemoState(): DemoStorageLoadResult {
         meta: {
           key: STORAGE_KEY,
           status: "recovered",
-          message: "Data localStorage tidak valid. State demo dipulihkan ke default.",
+          message: "Data localStorage tidak valid. Progres dipulihkan ke pengaturan awal.",
         },
       };
     }
@@ -124,7 +143,7 @@ export function loadDemoState(): DemoStorageLoadResult {
       meta: {
         key: STORAGE_KEY,
         status: "loaded",
-        message: "State demo berhasil dibaca dari localStorage.",
+        message: "Data progres berhasil dimuat.",
       },
     };
   } catch {
@@ -133,7 +152,7 @@ export function loadDemoState(): DemoStorageLoadResult {
       meta: {
         key: STORAGE_KEY,
         status: "recovered",
-        message: "Data localStorage rusak. State demo dipulihkan ke default.",
+        message: "Data localStorage rusak. Progres dipulihkan ke pengaturan awal.",
       },
     };
   }
@@ -145,30 +164,31 @@ export function saveDemoState(state: DemoState): DemoStorageMeta {
     return {
       key: STORAGE_KEY,
       status: "saved",
-      message: "State demo berhasil disimpan ke localStorage.",
+      message: "Progres berhasil disimpan.",
     };
   } catch {
     return {
       key: STORAGE_KEY,
       status: "unavailable",
-      message: "localStorage tidak tersedia atau penuh. Perubahan hanya aktif di sesi ini.",
+      message: "Penyimpanan lokal penuh atau tidak tersedia. Perubahan hanya aktif di sesi ini.",
     };
   }
 }
 
 export function clearDemoState(): DemoStorageMeta {
   try {
+    localStorage.removeItem("lingoland_demo_v1");
     localStorage.removeItem(STORAGE_KEY);
     return {
       key: STORAGE_KEY,
       status: "initialized",
-      message: "State demo dihapus dan siap dibuat ulang.",
+      message: "Data progres berhasil direset.",
     };
   } catch {
     return {
       key: STORAGE_KEY,
       status: "unavailable",
-      message: "localStorage tidak dapat dihapus dari browser ini.",
+      message: "Penyimpanan lokal tidak dapat dihapus dari browser ini.",
     };
   }
 }

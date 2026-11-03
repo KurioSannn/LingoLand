@@ -112,7 +112,7 @@ export function StorePage() {
         </div>
         <div className="grid gap-2 rounded-md border border-neutral-200 bg-white px-4 py-3 text-sm sm:grid-cols-2">
           <div>
-            <p className="font-semibold text-neutral-700">Koin Demo</p>
+            <p className="font-semibold text-neutral-700">Koin Kamu</p>
             <p className="inline-flex items-center gap-1 text-neutral-500">
               <Coins size={15} className="text-coin" />
               {formatCoins(state.user.coins)}
@@ -130,7 +130,7 @@ export function StorePage() {
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h2 className="text-xl font-bold text-neutral-950">Produk</h2>
-              <p className="mt-1 text-sm text-neutral-500">Item ini hanya menggunakan koin demo.</p>
+              <p className="mt-1 text-sm text-neutral-500">Item ini dapat dibeli menggunakan koin hasil latihan.</p>
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {filters.map((filter) => (
@@ -210,7 +210,7 @@ export function StorePage() {
               {formatCoins(selectedItem.price)} koin
             </p>
             <p className="mt-3 rounded-md bg-primary-50 p-3 text-sm text-primary-600">
-              Item ini hanya menggunakan koin demo.
+              Item ini dapat dibeli menggunakan koin hasil latihan.
             </p>
           </div>
 

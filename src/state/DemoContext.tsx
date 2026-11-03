@@ -67,7 +67,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (current.isAuthenticated && current.user.id !== "demo-user") {
+      if (current.isAuthenticated && !current.isGuest) {
         dispatch({ type: "LOGOUT" });
       }
     }
@@ -117,7 +117,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     }
   }, [state]);
 
-  const loginError = useMemo(() => (state.isAuthenticated ? null : "Email atau password demo tidak sesuai."), [state.isAuthenticated]);
+  const loginError = useMemo(() => (state.isAuthenticated ? null : "Email atau password tidak sesuai."), [state.isAuthenticated]);
 
   const value = useMemo(
     () => ({ state, dispatch, loginError, storageMeta, isSessionChecked }),

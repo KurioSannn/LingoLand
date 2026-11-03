@@ -34,7 +34,7 @@ export function TopUpPage() {
           <Badge tone="prototype">Segera Hadir</Badge>
           <h1 className="mt-4 text-3xl font-bold text-neutral-950">Top Up Koin</h1>
           <p className="mt-2 max-w-2xl text-neutral-500">
-            Preview paket dan promo top up koin. Prototype ini belum terhubung ke payment gateway sungguhan, jadi pembelian belum bisa diproses.
+            Preview paket dan promo top up koin. Pembayaran dengan uang asli sedang dinonaktifkan; seluruh item toko dapat diperoleh melalui koin hasil latihan dan misi.
           </p>
         </div>
         <div className="rounded-md border border-neutral-200 bg-white px-4 py-3 text-sm">
@@ -75,7 +75,7 @@ export function TopUpPage() {
       </div>
 
       <Card className="mt-8 max-w-2xl bg-primary-50">
-        <p className="font-bold text-neutral-950">Pembelian koin dengan uang asli belum tersedia di prototype ini.</p>
+        <p className="font-bold text-neutral-950">Pembelian koin dengan uang asli belum diaktifkan saat ini.</p>
         <p className="mt-2 text-sm text-neutral-700">
           Untuk sekarang, koin bisa didapat dengan menyelesaikan misi speaking di{" "}
           <Link to="/app/learn" className="font-semibold text-primary-600 underline underline-offset-2">

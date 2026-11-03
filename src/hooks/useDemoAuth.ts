@@ -33,7 +33,7 @@ export function useDemoAuth() {
 
     if (!isSupabaseConfigured) {
       dispatch({ type: "LOGIN_WITH_CREDENTIALS", email: trimmedEmail, password });
-      return { ok: true, message: "Akun lokal siap digunakan (mode prototype offline)." };
+      return { ok: true, message: "Login berhasil." };
     }
 
     setIsSyncing(true);
@@ -61,8 +61,8 @@ export function useDemoAuth() {
     }
 
     if (!isSupabaseConfigured) {
-      dispatch({ type: "LOGIN_WITH_CREDENTIALS", email: trimmedEmail, password });
-      return { ok: true, message: "Akun lokal berhasil didaftarkan (mode prototype offline)." };
+      dispatch({ type: "LOGIN_WITH_CREDENTIALS", email: trimmedEmail, password, name });
+      return { ok: true, message: "Akun berhasil didaftarkan." };
     }
 
     setIsSyncing(true);

@@ -4,6 +4,7 @@ import type { AvatarConfig, DemoState, DemoUser, MissionProgress, UserRole } fro
 
 export interface RemoteState {
   user: Pick<DemoUser, "name" | "username" | "level" | "xp" | "coins" | "hearts" | "streakDays"> & {
+    email?: string;
     role?: UserRole;
   };
   avatar: AvatarConfig;
@@ -166,33 +167,62 @@ export interface HydratePayload {
 // vs. an existing remote resolve to the same HYDRATE_REMOTE shape once.
 export async function resolveHydratePayload(userId: string): Promise<HydratePayload> {
   const remote = await fetchRemoteState(userId);
-  if (!remote) {
-    if (supabase) {
-      const { data } = await supabase.auth.getUser();
-      if (data.user && data.user.id === userId) {
-        const email = data.user.email ?? "";
-        const name = (data.user.user_metadata?.name as string | undefined) || email.split("@")[0] || "Learner";
-        const username =
-          (data.user.user_metadata?.username as string | undefined) ||
-          name.toLowerCase().replace(/[^a-z0-9_.]/g, "");
-        const role = await fetchUserRole(userId);
-        return {
-          userId,
-          user: {
-            name,
-            username,
-            level: 1,
-            xp: 0,
-            coins: 1000,
-            hearts: 5,
-            streakDays: 1,
-            role,
-          },
-        };
+  let authEmail = "";
+  let authMetaName: string | undefined;
+  let authMetaUsername: string | undefined;
+
+  if (supabase?.auth?.getUser) {
+    try {
+      const authRes = await supabase.auth.getUser();
+      if (authRes?.data?.user && authRes.data.user.id === userId) {
+        authEmail = authRes.data.user.email ?? "";
+        authMetaName = authRes.data.user.user_metadata?.name as string | undefined;
+        authMetaUsername = authRes.data.user.user_metadata?.username as string | undefined;
       }
+    } catch {
+      // Abaikan jika gagal mengambil metadata sesi
+    }
+  }
+
+  if (!remote) {
+    if (authEmail || authMetaName) {
+      const name = authMetaName || authEmail.split("@")[0] || "Pembelajar";
+      const username =
+        authMetaUsername ||
+        name.toLowerCase().replace(/[^a-z0-9_.]/g, "") ||
+        "pembelajar";
+      const role = await fetchUserRole(userId);
+      return {
+        userId,
+        user: {
+          name,
+          username,
+          email: authEmail,
+          level: 1,
+          xp: 0,
+          coins: 1000,
+          hearts: 5,
+          streakDays: 1,
+          role,
+        },
+      };
     }
     return { userId };
   }
+
+  // Self-heal legacy demo profile values if they were previously synced to remote
+  const isLegacyDemoName =
+    remote.user.name === "Raka Demo" ||
+    remote.user.username === "raka.demo" ||
+    remote.user.name === "Pengguna Tamu";
+  const resolvedName =
+    isLegacyDemoName && (authMetaName || authEmail)
+      ? authMetaName || authEmail.split("@")[0] || remote.user.name
+      : remote.user.name;
+  const resolvedUsername =
+    isLegacyDemoName && (authMetaUsername || authEmail)
+      ? authMetaUsername || resolvedName.toLowerCase().replace(/[^a-z0-9_.]/g, "") || remote.user.username
+      : remote.user.username;
 
   const completedMissionIds = Object.entries(remote.missionProgress)
     .filter(([, progress]) => progress.status === "completed")
@@ -200,7 +230,12 @@ export async function resolveHydratePayload(userId: string): Promise<HydratePayl
 
   return {
     userId,
-    user: remote.user,
+    user: {
+      ...remote.user,
+      name: resolvedName,
+      username: resolvedUsername,
+      ...(authEmail ? { email: authEmail } : {}),
+    },
     avatar: remote.avatar,
     inventory: remote.inventory,
     missionProgress: remote.missionProgress,

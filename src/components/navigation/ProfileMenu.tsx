@@ -39,7 +39,7 @@ export function ProfileMenu({ userName, onResetRequest, onLogout }: ProfileMenuP
           </button>
           <button className="menu-item" type="button" role="menuitem" onClick={() => select(onResetRequest)}>
             <RotateCcw size={16} />
-            Reset Progress Demo
+            Reset Progres Belajar
           </button>
           <button className="menu-item menu-item-danger" type="button" role="menuitem" onClick={() => select(onLogout)}>
             <LogOut size={16} />

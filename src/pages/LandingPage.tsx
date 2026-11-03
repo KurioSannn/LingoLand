@@ -16,7 +16,7 @@ import { Card } from "../components/ui/Card";
 import { FriendAvatar } from "../components/ui/FriendAvatar";
 import { Reveal } from "../components/ui/Reveal";
 import { LandingAvatarScene } from "../components/three/LandingAvatarScene";
-import { DEMO_EMAIL, friends, npcs, storeItems } from "../data/demoData";
+import { friends, npcs, storeItems } from "../data/demoData";
 import { formatCoins } from "../lib/game";
 import { useDismissable } from "../hooks/useDismissable";
 import type { AvatarConfig } from "../types";
@@ -108,7 +108,7 @@ export function LandingPage() {
 
           <div className="landing-nav-actions">
             <Link to="/login" className="landing-outline-button">
-              COBA DEMO
+              MASUK / DAFTAR
               <ChevronDown size={18} aria-hidden />
             </Link>
             <div className="menu-container lg:hidden" ref={mobileMenu.containerRef}>
@@ -166,7 +166,7 @@ export function LandingPage() {
           <div className="landing-cta-row" aria-label="Aksi utama">
             <Link to="/login" className="landing-pill-cta">
               <span><ChevronDown size={22} /></span>
-              PLAY DEMO
+              MULAI BELAJAR
             </Link>
             <a href="#karakter" className="landing-pill-cta">
               <span><ChevronDown size={22} /></span>
@@ -269,7 +269,7 @@ export function LandingPage() {
             ))}
           </div>
           <p className="relative z-10 mt-16 text-center text-sm font-semibold text-[#2b2140]">
-            Karakter lain dalam versi demo merupakan simulasi.
+            Berinteraksi langsung dengan karakter NPC maupun sesama pemain di Social Plaza.
           </p>
         </div>
       </section>
@@ -277,14 +277,14 @@ export function LandingPage() {
       <section id="mini-home" className="border-y border-neutral-200 bg-white py-16 lg:py-24">
         <div className="page-shell grid items-center gap-12 lg:grid-cols-2">
           <Reveal variant="left">
-            <Badge tone="prototype">Prototype Interaksi</Badge>
+            <Badge tone="info">Interaksi 3D</Badge>
             <h2 className="landing-section-heading mt-4">Mini Home, Ruang Latihanmu</h2>
             <p className="mt-5 max-w-xl text-lg leading-8 text-neutral-500">
               Jelajahi satu room, dekati karakter, dan mulai percakapan terarah. Kamu bisa berjalan dengan keyboard atau kontrol sentuh, bertemu NPC, dan menyelesaikan misi speaking.
             </p>
             <Link to="/login" className="landing-pill-cta mt-8">
               <span><ChevronDown size={22} /></span>
-              COBA MINI HOME
+              JELAJAHI MINI HOME
             </Link>
           </Reveal>
           <Reveal variant="right">
@@ -303,7 +303,7 @@ export function LandingPage() {
         <Reveal variant="left" className="h-full">
           <Card className="h-full">
             <h2 className="text-2xl font-black uppercase text-[#2b2140]">Teman Belajar</h2>
-            <p className="mt-2 text-sm text-neutral-500">Simulasi teman belajar — bukan pengguna real-time.</p>
+            <p className="mt-2 text-sm text-neutral-500">Terhubung dengan sesama pembelajar dan berlatih bersama di Social Plaza.</p>
             <ul className="mt-5 flex flex-col gap-4">
               {friends.slice(0, 4).map((friend) => (
                 <li key={friend.id} className="flex items-center gap-3">
@@ -320,7 +320,7 @@ export function LandingPage() {
         <Reveal variant="right" className="h-full">
           <Card className="h-full">
             <h2 className="text-2xl font-black uppercase text-[#2b2140]">Toko Avatar</h2>
-            <p className="mt-2 text-sm text-neutral-500">Item ini hanya menggunakan koin demo.</p>
+            <p className="mt-2 text-sm text-neutral-500">Item kustomisasi diperoleh menggunakan koin hasil latihan.</p>
             <ul className="mt-5 grid grid-cols-2 gap-4">
               {storeItems.slice(0, 4).map((item) => (
                 <li key={item.id} className="rounded-md border border-neutral-200 p-4 transition duration-300 hover:-translate-y-1 hover:shadow-layer">
@@ -347,7 +347,7 @@ export function LandingPage() {
             </h2>
             <Link to="/login" className="landing-pill-cta-light mt-10">
               <span><ChevronDown size={22} /></span>
-              MASUK SEBAGAI DEMO
+              MULAI SEKARANG
             </Link>
           </div>
         </Reveal>
@@ -381,8 +381,8 @@ export function LandingPage() {
           <div>
             <h2 className="text-sm font-black uppercase tracking-wide">Akses Cepat</h2>
             <div className="mt-4 rounded-md border border-white/15 p-4 text-sm">
-              <p className="font-semibold opacity-70">Akun Uji Coba</p>
-              <p className="mt-1 break-all font-bold">{DEMO_EMAIL}</p>
+              <p className="font-semibold opacity-70">Mulai Belajar</p>
+              <p className="mt-1 font-bold">Daftar akun baru atau masuk</p>
               <Link to="/login" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-white px-4 text-sm font-black text-[#160d2d] transition hover:bg-primary-50">
                 Masuk ke Aplikasi
               </Link>

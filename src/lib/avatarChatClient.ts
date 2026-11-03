@@ -10,7 +10,7 @@ export interface AvatarChatResult {
   reply: string;
 }
 
-const NOT_CONFIGURED_REPLY = "Fitur ngobrol AI belum aktif di prototype ini. Backend proxy-nya sudah disiapkan, tinggal menunggu Gemini API key dipasang.";
+const NOT_CONFIGURED_REPLY = "Layanan percakapan AI belum terhubung. Silakan pastikan koneksi cloud sudah aktif.";
 const TRANSIENT_ERROR_REPLY = "Avatar lagi susah dihubungi (server AI sibuk atau koneksi bermasalah). Coba kirim pesan itu lagi sebentar lagi.";
 
 // Calls the `avatar-chat` Supabase Edge Function, which proxies to Gemini.

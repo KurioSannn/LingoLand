@@ -31,7 +31,7 @@ export function AppLayout() {
   function confirmReset() {
     resetProgress();
     setIsResetModalOpen(false);
-    setToastMessage("Progress demo berhasil di-reset.");
+    setToastMessage("Progres belajar berhasil di-reset.");
   }
 
   return (
@@ -88,7 +88,7 @@ export function AppLayout() {
         </NavLink>
       </nav>
 
-      <Modal isOpen={isResetModalOpen} title="Reset semua progress demo?" onClose={() => setIsResetModalOpen(false)}>
+      <Modal isOpen={isResetModalOpen} title="Reset semua progres belajar?" onClose={() => setIsResetModalOpen(false)}>
         <p className="mt-3 text-sm leading-6 text-neutral-500">
           XP, koin, avatar, inventory, dan status misi akan kembali ke kondisi awal.
         </p>

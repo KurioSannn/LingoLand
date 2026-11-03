@@ -5,7 +5,6 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
-import { DEMO_EMAIL, DEMO_PASSWORD } from "../data/demoData";
 import { useDemoAuth } from "../hooks/useDemoAuth";
 
 interface LoginLocationState {
@@ -73,12 +72,6 @@ export function LoginPage() {
     navigate(redirectTo, { replace: true });
   }
 
-  function fillDemoCredentials() {
-    setEmail(DEMO_EMAIL);
-    setPassword(DEMO_PASSWORD);
-    setError("");
-  }
-
   return (
     <main className="min-h-screen bg-neutral-50">
       <section className="page-shell grid min-h-screen items-center gap-8 lg:grid-cols-2">
@@ -86,27 +79,17 @@ export function LoginPage() {
           <Badge tone="info">Autentikasi Akun</Badge>
           <h1 className="mt-4 text-3xl font-bold text-neutral-950">Masuk ke Lingoland</h1>
           <p className="mt-3 text-neutral-600">
-            Masuk dengan akun terdaftar untuk menyimpan progres latihan secara permanen, atau coba mode tamu lokal.
+            Masuk dengan akun terdaftar untuk menyinkronkan progres latihan, koin, avatar, dan fitur multiplayer Social Plaza secara permanen.
           </p>
 
           <div className="mt-6 rounded-lg border border-primary-200 bg-white p-4">
             <h2 className="flex items-center gap-2 text-sm font-bold text-neutral-900">
               <UserCheck size={18} className="text-primary-600" />
-              Mode Tamu / Akun Uji Coba
+              Akses Mode Tamu Instan
             </h2>
             <p className="mt-1 text-xs text-neutral-500">
-              Ingin langsung mencoba gameplay tanpa registrasi? Kamu bisa gunakan tombol <strong>Masuk sebagai Tamu</strong> atau isi kredensial demo.
+              Ingin langsung mencoba latihan di Mini Home tanpa mendaftar? Gunakan tombol <strong>Masuk sebagai Tamu</strong> di samping untuk menyimpan progres secara lokal di perangkat ini.
             </p>
-            <div className="mt-3 flex items-center justify-between gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-600">
-              <span>{DEMO_EMAIL}</span>
-              <button
-                type="button"
-                onClick={fillDemoCredentials}
-                className="font-semibold text-primary-600 hover:underline"
-              >
-                Gunakan Akun Demo
-              </button>
-            </div>
           </div>
         </Card>
 

@@ -33,7 +33,7 @@ export function ProfilePage() {
   function confirmReset() {
     resetProgress();
     setIsResetModalOpen(false);
-    setToastMessage("Progress demo berhasil di-reset.");
+    setToastMessage("Progres belajar berhasil di-reset.");
   }
 
   return (
@@ -82,7 +82,7 @@ export function ProfilePage() {
             </Link>
             <Button variant="secondary" onClick={() => setIsResetModalOpen(true)}>
               <RotateCcw size={16} aria-hidden />
-              Reset Progress Demo
+              Reset Progres Belajar
             </Button>
             <Button variant="ghost" onClick={handleLogout}>
               <LogOut size={16} aria-hidden />
@@ -139,7 +139,7 @@ export function ProfilePage() {
         </div>
       </div>
 
-      <Modal isOpen={isResetModalOpen} title="Reset semua progress demo?" onClose={() => setIsResetModalOpen(false)}>
+      <Modal isOpen={isResetModalOpen} title="Reset semua progres belajar?" onClose={() => setIsResetModalOpen(false)}>
         <p className="mt-3 text-sm leading-6 text-neutral-500">
           XP, koin, avatar, inventory, dan status misi akan kembali ke kondisi awal.
         </p>

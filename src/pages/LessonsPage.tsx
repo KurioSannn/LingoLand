@@ -43,7 +43,7 @@ const pathMeta = {
 };
 
 function pathItemHint(item: LearningPathItemSummary): string {
-  if (item.status === "coming-soon") return "Fitur ini belum tersedia di MVP.";
+  if (item.status === "coming-soon") return "Modul ini sedang dalam tahap pengembangan.";
   if (item.status === "locked") return "Selesaikan bab sebelumnya untuk membuka ini.";
   if (!item.lessonUnitId) return "Langkah dasar sudah termasuk dalam onboarding kamu.";
   if (item.status === "completed") return "Sudah selesai. Klik untuk latihan ulang.";

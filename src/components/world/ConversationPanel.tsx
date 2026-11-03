@@ -84,7 +84,7 @@ export function ConversationPanel({ npc, onClose }: { npc: NpcCharacter; onClose
     <aside className="conversation-panel" aria-label={`Percakapan dengan ${npc.name}`}>
       <div className="panel-header">
         <div>
-          <Badge tone="prototype">Prototype Interaksi</Badge>
+          <Badge tone="info">Latihan Percakapan</Badge>
           <h2>{npc.name}</h2>
           <p>{npc.personality}</p>
         </div>

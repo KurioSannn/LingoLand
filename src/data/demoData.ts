@@ -10,14 +10,14 @@ import type {
   StoreItem,
 } from "../types";
 
-export const DEMO_EMAIL = "demo@lingoland.app";
+export const DEMO_EMAIL = "tamu@lingoland.local";
 export const DEMO_PASSWORD = "Demo123!";
-export const STORAGE_KEY = "lingoland_demo_v1";
+export const STORAGE_KEY = "lingoland_app_state_v2";
 
 export const defaultUser: DemoUser = {
-  id: "demo-user",
-  name: "Raka Demo",
-  username: "raka.demo",
+  id: "guest-user",
+  name: "Pengguna Tamu",
+  username: "tamu",
   email: DEMO_EMAIL,
   level: 2,
   xp: 120,
@@ -285,8 +285,8 @@ export function createInitialState(isAuthenticated = false): DemoState {
     completedLessonIds: [],
     recentActivity: [
       "Misi Perkenalan Diri belum selesai.",
-      "Kamu memiliki 15.000 koin demo.",
-      "Karakter lain dalam versi demo merupakan simulasi.",
+      "Kamu memiliki 15.000 koin awal untuk kustomisasi.",
+      "Jelajahi Mini Home dan Social Plaza untuk mulai berlatih.",
     ],
   };
 }

@@ -5,7 +5,7 @@ import type { AvatarConfig, DemoState, MissionProgress, MissionStatus } from "..
 
 export type DemoAction =
   | { type: "LOGIN_DEMO" }
-  | { type: "LOGIN_WITH_CREDENTIALS"; email: string; password?: string }
+  | { type: "LOGIN_WITH_CREDENTIALS"; email: string; password?: string; name?: string }
   | { type: "LOGOUT" }
   | { type: "RESET_PROGRESS" }
   | ({ type: "HYDRATE_REMOTE" } & HydratePayload)
@@ -39,17 +39,33 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
         },
         recentActivity: recent("Masuk sebagai akun tamu (tersimpan lokal).", state.recentActivity),
       };
-    case "LOGIN_WITH_CREDENTIALS":
+    case "LOGIN_WITH_CREDENTIALS": {
+      const isDefaultGuest =
+        state.user.id === "guest-user" ||
+        state.user.id === "demo-user" ||
+        state.user.name === "Pengguna Tamu" ||
+        state.user.name === "Raka Demo";
+      const derivedName =
+        action.name?.trim() ||
+        (!isDefaultGuest && state.user.name ? state.user.name : action.email.split("@")[0] || "Pembelajar");
+      const derivedUsername =
+        (!isDefaultGuest && state.user.username ? state.user.username : derivedName.toLowerCase().replace(/[^a-z0-9_.]/g, "")) ||
+        "pembelajar";
       return {
         ...state,
         isAuthenticated: true,
         isGuest: false,
         user: {
           ...state.user,
+          id: isDefaultGuest ? `user-${derivedUsername}` : state.user.id,
+          name: derivedName,
+          username: derivedUsername,
           email: action.email,
+          isGuest: false,
         },
         recentActivity: recent("Login berhasil.", state.recentActivity),
       };
+    }
     case "LOGOUT":
       return {
         ...createInitialState(false),

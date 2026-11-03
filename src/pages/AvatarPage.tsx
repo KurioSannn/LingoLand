@@ -155,7 +155,7 @@ export function AvatarPage() {
             <div>
               <h2 className="text-xl font-bold text-neutral-950">Pilihan Item</h2>
               <p className="mt-1 text-sm text-neutral-500">
-                Koin demo: <strong>{formatCoins(state.user.coins)}</strong>
+                Koin kamu: <strong>{formatCoins(state.user.coins)}</strong>
               </p>
             </div>
             <ShoppingBag className="text-primary-500" size={26} aria-hidden />

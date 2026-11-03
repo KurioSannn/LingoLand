@@ -215,7 +215,7 @@ export function WorldPage() {
               <Coins size={16} className="text-coin" aria-hidden />
               +{mission.rewardCoins} koin
             </p>
-            <p className="mt-4 text-xs text-neutral-500">Karakter lain dalam versi demo merupakan simulasi.</p>
+            <p className="mt-4 text-xs text-neutral-500">Dekati karakter NPC di dalam ruangan untuk memulai latihan percakapan.</p>
           </aside>
         )}
       </div>
