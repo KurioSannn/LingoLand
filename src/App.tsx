@@ -3,6 +3,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { AvatarChatPage } from "./pages/AvatarChatPage";
 import { AvatarPage } from "./pages/AvatarPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { FriendsPage } from "./pages/FriendsPage";
 import { HomePage } from "./pages/HomePage";
 import { LandingPage } from "./pages/LandingPage";
@@ -11,6 +12,7 @@ import { LessonPage } from "./pages/LessonPage";
 import { LessonsPage } from "./pages/LessonsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { RegisterPage } from "./pages/RegisterPage";
 import { StorePage } from "./pages/StorePage";
 import { TopUpPage } from "./pages/TopUpPage";
 import { WorldPage } from "./pages/WorldPage";
@@ -22,6 +24,8 @@ export function App() {
     <Routes location={location}>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route
         path="/app"
         element={

@@ -133,7 +133,31 @@ export interface HydratePayload {
 // vs. an existing remote resolve to the same HYDRATE_REMOTE shape once.
 export async function resolveHydratePayload(userId: string): Promise<HydratePayload> {
   const remote = await fetchRemoteState(userId);
-  if (!remote) return { userId };
+  if (!remote) {
+    if (supabase) {
+      const { data } = await supabase.auth.getUser();
+      if (data.user && data.user.id === userId) {
+        const email = data.user.email ?? "";
+        const name = (data.user.user_metadata?.name as string | undefined) || email.split("@")[0] || "Learner";
+        const username =
+          (data.user.user_metadata?.username as string | undefined) ||
+          name.toLowerCase().replace(/[^a-z0-9_.]/g, "");
+        return {
+          userId,
+          user: {
+            name,
+            username,
+            level: 1,
+            xp: 0,
+            coins: 1000,
+            hearts: 5,
+            streakDays: 1,
+          },
+        };
+      }
+    }
+    return { userId };
+  }
 
   const completedMissionIds = Object.entries(remote.missionProgress)
     .filter(([, progress]) => progress.status === "completed")

@@ -1,11 +1,11 @@
-import { createInitialState, DEMO_EMAIL, DEMO_PASSWORD } from "../data/demoData";
+import { createInitialState, defaultUser } from "../data/demoData";
 import { calculateLevel } from "../lib/game";
 import type { HydratePayload } from "../lib/supabaseSync";
 import type { AvatarConfig, DemoState, MissionProgress, MissionStatus } from "../types";
 
 export type DemoAction =
   | { type: "LOGIN_DEMO" }
-  | { type: "LOGIN_WITH_CREDENTIALS"; email: string; password: string }
+  | { type: "LOGIN_WITH_CREDENTIALS"; email: string; password?: string }
   | { type: "LOGOUT" }
   | { type: "RESET_PROGRESS" }
   | ({ type: "HYDRATE_REMOTE" } & HydratePayload)
@@ -24,14 +24,37 @@ function recent(message: string, current: string[]): string[] {
 export function demoReducer(state: DemoState, action: DemoAction): DemoState {
   switch (action.type) {
     case "LOGIN_DEMO":
-      return { ...state, isAuthenticated: true, recentActivity: recent("Akun demo siap digunakan.", state.recentActivity) };
+      return {
+        ...state,
+        isAuthenticated: true,
+        isGuest: true,
+        user: {
+          ...defaultUser,
+          id: "guest-user",
+          name: "Pengguna Tamu",
+          username: "tamu",
+          email: "guest@lingoland.local",
+          isGuest: true,
+        },
+        recentActivity: recent("Masuk sebagai akun tamu (tersimpan lokal).", state.recentActivity),
+      };
     case "LOGIN_WITH_CREDENTIALS":
-      if (action.email === DEMO_EMAIL && action.password === DEMO_PASSWORD) {
-        return { ...state, isAuthenticated: true, recentActivity: recent("Login demo berhasil.", state.recentActivity) };
-      }
-      return { ...state, isAuthenticated: false };
+      return {
+        ...state,
+        isAuthenticated: true,
+        isGuest: false,
+        user: {
+          ...state.user,
+          email: action.email,
+        },
+        recentActivity: recent("Login berhasil.", state.recentActivity),
+      };
     case "LOGOUT":
-      return { ...state, isAuthenticated: false };
+      return {
+        ...createInitialState(false),
+        isAuthenticated: false,
+        isGuest: false,
+      };
     case "RESET_PROGRESS":
       return createInitialState(state.isAuthenticated);
     case "SET_ACTIVE_MISSION": {
@@ -112,13 +135,14 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
       return {
         ...state,
         isAuthenticated: true,
-        user: { ...state.user, ...action.user, id: action.userId },
+        isGuest: false,
+        user: { ...state.user, ...action.user, id: action.userId, isGuest: false },
         avatar: action.avatar ?? state.avatar,
         inventory: action.inventory ?? state.inventory,
         missionProgress: action.missionProgress ?? state.missionProgress,
         completedMissionIds: action.completedMissionIds ?? state.completedMissionIds,
         claimedRewards: action.claimedRewards ?? state.claimedRewards,
-        recentActivity: recent("Login berhasil terhubung ke Supabase.", state.recentActivity),
+        recentActivity: recent("Login berhasil terhubung ke server.", state.recentActivity),
       };
     default:
       return state;

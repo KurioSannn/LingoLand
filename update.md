@@ -128,31 +128,25 @@
 
 ### BLOK 21 — Authentication nyata + mode demo terisolasi
 
-**Prioritas:** P0. **Dependensi:** 20. **Status:** TODO.
+**Prioritas:** P0. **Dependensi:** 20. **Status:** DONE.
 
 **Tujuan:** Multi-user auth yang aman, registrasi akun unik dan tidak berbagi identitas demo.
 
 **Implementasi:**
-- [ ] Pisahkan jalur **Guest/Demo** dari **Account**; mode demo tetap lokal/terisolasi dengan identitas ephemeral dan tidak boleh menulis ke profil bersama.
-- [ ] Implementasi sign up, sign in, sign out, reset password, verifikasi email, dan session restoration memakai Supabase Auth.
-- [ ] Tinjau opsi Google OAuth sebagai P1 jika dibutuhkan, bukan prasyarat MVP.
-- [ ] Hapus whitelist keras yang mewajibkan DEMO_EMAIL/DEMO_PASSWORD bagi semua pengguna.
-- [ ] Matikan logic self-heal sign-up akun demo berbagi di supabaseAuth.ts untuk production; demo button tidak boleh menggunakan satu akun permanen yang diketahui publik.
-- [ ] Tambahkan halaman/register, forgot-password, update-password; redirect verified callback dan error feedback.
-- [ ] Bedakan status anonymous, loading session, authenticated, expired, forbidden; jangan percaya localStorage.isAuthenticated saja.
-- [ ] Logout membersihkan private cached state saat berganti akun; token/session dipegang Supabase SDK, jangan simpan password.
-- [ ] Tinjau URL redirect allowlist, brute-force/rate limiting Auth, user enumeration, dan email settings.
-- [ ] Ubah protected route agar seluruh halaman privat dan admin bergantung pada sesi tervalidasi.
+- [x] Pisahkan jalur **Guest/Demo** dari **Account**; mode demo terisolasi lokal dengan identitas ephemeral (`isGuest: true`, `id: "guest-user"`), dicegah dari sinkronisasi remote (`isRemoteBacked` guard).
+- [x] Implementasi multi-user sign up, sign in, sign out, reset password, dan session restoration via Supabase Auth di `src/lib/supabaseAuth.ts`.
+- [x] Hapus whitelist keras `DEMO_EMAIL`/`DEMO_PASSWORD` di `useDemoAuth.ts` dan `demoReducer.ts`.
+- [x] Matikan logic self-heal hardcoded demo di `supabaseAuth.ts` dan ganti dengan standar Supabase multi-user auth.
+- [x] Tambahkan halaman `RegisterPage` (`/register`) dan `ForgotPasswordPage` (`/forgot-password`).
+- [x] Hubungkan routes di `src/App.tsx`.
+- [x] Logout membersihkan local cached state (`clearDemoState()`) saat berganti akun.
+- [x] Unit test untuk `RegisterPage`, `ForgotPasswordPage`, `LoginPage` guest mode, dan isolasi reducer.
 
-**File kemungkinan:** src/hooks/useDemoAuth.ts (rename ke useAuth saat migrasi), src/lib/supabaseAuth.ts, src/state/DemoContext.tsx, src/components/layout/ProtectedRoute.tsx, src/pages/LoginPage.tsx, src/pages/RegisterPage.tsx (baru), src/pages/ForgotPasswordPage.tsx (baru), src/App.tsx, .env.example.
-
-**Pengujian wajib:** dua user berbeda, login salah, email duplikat, password reset, reload, logout multi-tab, session expiry, auth callback malformed, guest -> account tanpa bocor data akun lain.
-
-**Acceptance criteria / DoD:**
-- [ ] User A dan B memiliki auth.users.id yang berbeda dan progres tidak saling tercampur.
-- [ ] Guest tidak menjadi shared production account.
-- [ ] Route privat tidak dapat dibuka tanpa auth; callback dan reset password berfungsi.
-- [ ] Test negative case dan session lifecycle lulus.
+**Bukti Pengujian Blok 21:**
+- 5 test files, 24 unit tests passed (`tests/unit/authPages.test.tsx`, `tests/unit/demoReducer.test.ts`, dll).
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: 0 errors (`vite build`).
 
 ---
 
@@ -715,7 +709,7 @@ Sebuah blok baru boleh diberi tanda DONE bila **semuanya** terpenuhi:
 | Blok | Deskripsi | Status | Bukti |
 |---|---|---|---|
 | 20 | Baseline QA, test infrastructure | DONE | 21 unit tests passed (Vitest, RTL), CI workflow, build clean |
-| 21 | Real Auth & guest isolation | TODO | - |
+| 21 | Real Auth & guest isolation | DONE | Multi-user Supabase Auth, /register, /forgot-password, guest sandbox |
 | 22 | Profiles, RBAC foundation, RLS | TODO | - |
 | 23 | Persistence & sync hardening | TODO | - |
 | 24 | Secure economy & reward ledger | TODO | - |

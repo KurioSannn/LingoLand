@@ -12,6 +12,7 @@ export interface DemoUser {
   coins: number;
   hearts: number;
   streakDays: number;
+  isGuest?: boolean;
 }
 
 export interface AvatarConfig {
@@ -119,6 +120,7 @@ export interface ConversationMessage {
 export interface DemoState {
   schemaVersion: 1;
   isAuthenticated: boolean;
+  isGuest?: boolean;
   user: DemoUser;
   avatar: AvatarConfig;
   inventory: string[];

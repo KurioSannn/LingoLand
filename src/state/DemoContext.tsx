@@ -21,7 +21,13 @@ const DemoContext = createContext<DemoContextValue | null>(null);
 // The local default id means the session was never hydrated from Supabase
 // (either not configured, or user is logged in via the offline fallback path).
 function isRemoteBacked(state: DemoState) {
-  return isSupabaseConfigured && state.isAuthenticated && state.user.id !== "demo-user";
+  return (
+    isSupabaseConfigured &&
+    state.isAuthenticated &&
+    !state.isGuest &&
+    state.user.id !== "demo-user" &&
+    state.user.id !== "guest-user"
+  );
 }
 
 export function DemoProvider({ children }: { children: ReactNode }) {

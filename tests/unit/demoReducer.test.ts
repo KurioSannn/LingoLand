@@ -1,34 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { createInitialState, DEMO_EMAIL, DEMO_PASSWORD } from "../../src/data/demoData";
+import { createInitialState } from "../../src/data/demoData";
 import { demoReducer } from "../../src/state/demoReducer";
 
 describe("demoReducer", () => {
-  it("handles LOGIN_DEMO and LOGOUT", () => {
+  it("handles LOGIN_DEMO as isolated guest mode", () => {
     const initial = createInitialState(false);
     expect(initial.isAuthenticated).toBe(false);
 
     const loggedIn = demoReducer(initial, { type: "LOGIN_DEMO" });
     expect(loggedIn.isAuthenticated).toBe(true);
+    expect(loggedIn.isGuest).toBe(true);
+    expect(loggedIn.user.id).toBe("guest-user");
 
     const loggedOut = demoReducer(loggedIn, { type: "LOGOUT" });
     expect(loggedOut.isAuthenticated).toBe(false);
+    expect(loggedOut.isGuest).toBe(false);
   });
 
-  it("handles LOGIN_WITH_CREDENTIALS with correct demo credentials", () => {
+  it("handles LOGIN_WITH_CREDENTIALS for any registered user email", () => {
     const initial = createInitialState(false);
-    const success = demoReducer(initial, {
+    const result = demoReducer(initial, {
       type: "LOGIN_WITH_CREDENTIALS",
-      email: DEMO_EMAIL,
-      password: DEMO_PASSWORD,
+      email: "user@example.com",
     });
-    expect(success.isAuthenticated).toBe(true);
-
-    const fail = demoReducer(initial, {
-      type: "LOGIN_WITH_CREDENTIALS",
-      email: "wrong@test.com",
-      password: "wrong",
-    });
-    expect(fail.isAuthenticated).toBe(false);
+    expect(result.isAuthenticated).toBe(true);
+    expect(result.isGuest).toBe(false);
+    expect(result.user.email).toBe("user@example.com");
   });
 
   it("handles RESET_PROGRESS restoring initial values", () => {

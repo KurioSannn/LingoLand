@@ -1,6 +1,7 @@
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, UserCheck } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
@@ -14,9 +15,9 @@ interface LoginLocationState {
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, loginAsDemo, loginWithCredentials } = useDemoAuth();
-  const [email, setEmail] = useState(DEMO_EMAIL);
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const { isAuthenticated, loginAsGuest, loginWithCredentials, isSyncing } = useDemoAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -35,6 +36,11 @@ export function LoginPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!email.trim() || !password) {
+      setError("Email dan password wajib diisi.");
+      return;
+    }
+
     setIsLoading(true);
     setError("");
     setSuccess("");
@@ -51,11 +57,11 @@ export function LoginPage() {
     navigate(redirectTo, { replace: true });
   }
 
-  async function loginDemo() {
+  async function handleGuestLogin() {
     setIsLoading(true);
     setError("");
 
-    const result = await loginAsDemo();
+    const result = await loginAsGuest();
     setIsLoading(false);
 
     if (!result.ok) {
@@ -67,32 +73,49 @@ export function LoginPage() {
     navigate(redirectTo, { replace: true });
   }
 
+  function fillDemoCredentials() {
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
+    setError("");
+  }
+
   return (
     <main className="min-h-screen bg-neutral-50">
       <section className="page-shell grid min-h-screen items-center gap-8 lg:grid-cols-2">
         <Card className="bg-primary-50">
-          <span className="badge badge-prototype">Blok 4 Auth</span>
-          <h1 className="text-3xl font-bold">Masuk ke Lingoland</h1>
-          <p className="mt-3 text-neutral-500">Gunakan akun demo untuk mencoba alur MVP secara lokal.</p>
-          <p className="mt-6 rounded-md bg-white p-4 text-sm text-neutral-700">
-            Akun demo disimpan secara lokal dan hanya digunakan untuk mencoba prototype.
+          <Badge tone="info">Blok 21 Auth</Badge>
+          <h1 className="mt-4 text-3xl font-bold text-neutral-950">Masuk ke Lingoland</h1>
+          <p className="mt-3 text-neutral-600">
+            Masuk dengan akun terdaftar untuk menyimpan progres latihan secara permanen, atau coba mode tamu lokal.
           </p>
-          <dl className="mt-6 grid gap-3 rounded-md border border-primary-100 bg-white p-4 text-sm">
-            <div>
-              <dt className="font-semibold text-neutral-700">Email</dt>
-              <dd className="text-neutral-500">{DEMO_EMAIL}</dd>
+
+          <div className="mt-6 rounded-lg border border-primary-200 bg-white p-4">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-neutral-900">
+              <UserCheck size={18} className="text-primary-600" />
+              Mode Tamu / Akun Uji Coba
+            </h2>
+            <p className="mt-1 text-xs text-neutral-500">
+              Ingin langsung mencoba gameplay tanpa registrasi? Kamu bisa gunakan tombol <strong>Masuk sebagai Tamu</strong> atau isi kredensial demo.
+            </p>
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-600">
+              <span>{DEMO_EMAIL}</span>
+              <button
+                type="button"
+                onClick={fillDemoCredentials}
+                className="font-semibold text-primary-600 hover:underline"
+              >
+                Gunakan Akun Demo
+              </button>
             </div>
-            <div>
-              <dt className="font-semibold text-neutral-700">Password</dt>
-              <dd className="text-neutral-500">{DEMO_PASSWORD}</dd>
-            </div>
-          </dl>
+          </div>
         </Card>
+
         <form className="card flex flex-col gap-5" onSubmit={submit} noValidate>
           <Input
             id="email"
             label="Email"
             type="email"
+            placeholder="nama@email.com"
             autoComplete="username"
             value={email}
             error={error || undefined}
@@ -101,31 +124,58 @@ export function LoginPage() {
               if (error) setError("");
             }}
           />
-          <Input
-            id="password"
-            label="Password"
-            type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => {
-              setPassword(event.target.value);
-              if (error) setError("");
-            }}
-          />
-          <button
-            className="button button-ghost w-fit px-0"
-            type="button"
-            onClick={() => setShowPassword((current) => !current)}
-            aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
-          >
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            {showPassword ? "Sembunyikan password" : "Tampilkan password"}
-          </button>
-          {success ? <p className="rounded-md bg-success-100 p-3 text-sm font-medium text-green-800">{success}</p> : null}
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button type="submit" isLoading={isLoading}>Masuk</Button>
-            <Button type="button" variant="secondary" onClick={loginDemo} disabled={isLoading}>Masuk sebagai Demo</Button>
+
+          <div className="flex flex-col gap-1.5">
+            <Input
+              id="password"
+              label="Password"
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                if (error) setError("");
+              }}
+            />
+            <div className="flex items-center justify-between pt-1">
+              <button
+                className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-700"
+                type="button"
+                onClick={() => setShowPassword((current) => !current)}
+              >
+                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                {showPassword ? "Sembunyikan password" : "Tampilkan password"}
+              </button>
+              <Link to="/forgot-password" className="text-xs font-semibold text-primary-600 hover:underline">
+                Lupa password?
+              </Link>
+            </div>
           </div>
+
+          {success ? <p className="rounded-md bg-success-100 p-3 text-sm font-medium text-green-800">{success}</p> : null}
+
+          <div className="mt-2 flex flex-col gap-3">
+            <Button type="submit" isLoading={isLoading || isSyncing} className="w-full">
+              Masuk
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleGuestLogin}
+              disabled={isLoading || isSyncing}
+              className="w-full"
+            >
+              Masuk sebagai Tamu (Offline)
+            </Button>
+          </div>
+
+          <p className="mt-3 text-center text-sm text-neutral-500">
+            Belum punya akun?{" "}
+            <Link to="/register" className="font-semibold text-primary-600 hover:underline">
+              Daftar sekarang
+            </Link>
+          </p>
         </form>
       </section>
     </main>
