@@ -1,8 +1,11 @@
+import { fetchUserRole } from "./profileRepository";
 import { supabase } from "./supabaseClient";
-import type { AvatarConfig, DemoState, DemoUser, MissionProgress } from "../types";
+import type { AvatarConfig, DemoState, DemoUser, MissionProgress, UserRole } from "../types";
 
 export interface RemoteState {
-  user: Pick<DemoUser, "name" | "username" | "level" | "xp" | "coins" | "hearts" | "streakDays">;
+  user: Pick<DemoUser, "name" | "username" | "level" | "xp" | "coins" | "hearts" | "streakDays"> & {
+    role?: UserRole;
+  };
   avatar: AvatarConfig;
   inventory: string[];
   missionProgress: Record<string, MissionProgress>;
@@ -12,12 +15,13 @@ export interface RemoteState {
 export async function fetchRemoteState(userId: string): Promise<RemoteState | null> {
   if (!supabase) return null;
 
-  const [profileRes, avatarRes, inventoryRes, missionRes, rewardsRes] = await Promise.all([
+  const [profileRes, avatarRes, inventoryRes, missionRes, rewardsRes, role] = await Promise.all([
     supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("avatar_configs").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("inventory_items").select("item_id").eq("user_id", userId),
     supabase.from("mission_progress").select("*").eq("user_id", userId),
     supabase.from("claimed_rewards").select("mission_id").eq("user_id", userId),
+    fetchUserRole(userId),
   ]);
 
   if (!profileRes.data) return null;
@@ -39,6 +43,7 @@ export async function fetchRemoteState(userId: string): Promise<RemoteState | nu
       coins: profileRes.data.coins,
       hearts: profileRes.data.hearts,
       streakDays: profileRes.data.streak_days,
+      role,
     },
     avatar: avatarRes.data
       ? {
@@ -142,6 +147,7 @@ export async function resolveHydratePayload(userId: string): Promise<HydratePayl
         const username =
           (data.user.user_metadata?.username as string | undefined) ||
           name.toLowerCase().replace(/[^a-z0-9_.]/g, "");
+        const role = await fetchUserRole(userId);
         return {
           userId,
           user: {
@@ -152,6 +158,7 @@ export async function resolveHydratePayload(userId: string): Promise<HydratePayl
             coins: 1000,
             hearts: 5,
             streakDays: 1,
+            role,
           },
         };
       }

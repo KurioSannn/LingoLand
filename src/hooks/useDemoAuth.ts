@@ -126,6 +126,8 @@ export function useDemoAuth() {
   return {
     isAuthenticated: state.isAuthenticated,
     isGuest: Boolean(state.isGuest || state.user.id === "demo-user" || state.user.id === "guest-user"),
+    role: state.user.role ?? "user",
+    isAdmin: state.user.role === "admin",
     currentUser: state.user,
     isSyncing,
     isSessionChecked,

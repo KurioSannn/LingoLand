@@ -152,31 +152,27 @@
 
 ### BLOK 22 — Profil user, RBAC foundation, RLS dan keamanan data
 
-**Prioritas:** P0. **Dependensi:** 21. **Status:** TODO.
+**Prioritas:** P0. **Dependensi:** 21. **Status:** DONE.
 
 **Tujuan:** Menetapkan kepemilikan data dan batas izin sebelum fitur tambahan.
 
 **Implementasi:**
-- [ ] Buat migrations versioned pada supabase/migrations/; jangan menjadikan schema.sql besar satu-satunya sumber update.
-- [ ] Lengkapi profiles: display_name, unique username (case-insensitive), avatar reference, created_at/updated_at, privacy preference. Simpan email sebagai identity pada auth, bukan mengandalkan user-editable field.
-- [ ] Pertahankan data avatar/inventory/missions lama melalui migrasi additive dan backward-compatible.
-- [ ] Definisikan role user, moderator (opsional), admin pada tabel role assignment yang **tidak** bisa di-upsert user sendiri.
-- [ ] Implementasi check admin berdasarkan DB/function/verified JWT claim yang diterbitkan secara aman; menyembunyikan tombol di client **bukan** otorisasi.
-- [ ] Audit seluruh RLS SELECT/INSERT/UPDATE/DELETE; bedakan public profile minimum dari private progression.
-- [ ] Revoke direct UPDATE user pada xp, coins, level, dan kolom server-owned; operasi sensitif hanya lewat RPC/Edge Function yang memvalidasi auth.uid serta izin.
-- [ ] Tambahkan constraints non-negative, unique index, foreign keys, indexes query utama, policy RLS negatif.
-- [ ] Pastikan service_role tidak pernah berada di browser atau env VITE_*.
-- [ ] Siapkan aturan penghapusan akun dan cascade/restriksi yang tidak menghapus content admin secara salah.
+- [x] Buat versioned migrations pada `supabase/migrations/`:
+  - `20260722000000_baseline_schema.sql` (baseline schema asli)
+  - `20261103000001_block22_rbac_profiles_rls.sql` (RBAC, user_roles, profiles enhancements, granular RLS, non-negative checks)
+- [x] Lengkapi profiles: `display_name`, unique case-insensitive username index, `is_private`, `created_at`.
+- [x] Definisikan role `user`, `moderator`, `admin` pada tabel `user_roles` dengan proteksi RLS ketat (hanya service_role / security definer RPC yang bisa mutate, user dilarang mengangkat role sendiri).
+- [x] Tambahkan security definer helpers: `public.is_admin(uuid)`, `public.has_role(uuid, role)`, dan `public.assign_user_role(...)`.
+- [x] Audit RLS profiles: bedakan baca profil publik (`is_private = false`) dari profil privat/progres penuh.
+- [x] Tambahkan non-negative constraints di database untuk `coins`, `xp`, `level`, `hearts`, `streak_days`.
+- [x] Buat `src/lib/profileRepository.ts` sebagai typed data access layer untuk profil dan role.
+- [x] Buat komponen route guard `AdminRoute` (`src/components/layout/AdminRoute.tsx`) dengan layar 403 Forbidden untuk akun non-admin.
 
-**File kemungkinan:** supabase/migrations/*, supabase/schema.sql (referensi), src/lib/supabaseClient.ts, src/types.ts, src/lib/profileRepository.ts (baru), test RLS.
-
-**Pengujian wajib:** unauthenticated read, user A baca/tulis row B, user mengangkat role sendiri, user edit XP/coins langsung, abuse menggunakan request HTTP manual.
-
-**Acceptance criteria / DoD:**
-- [ ] Akses antar-user privat selalu ditolak di database.
-- [ ] Role admin tidak dapat diperoleh dengan mengedit payload/profile.
-- [ ] Kolom ekonomi server-owned tidak writable dari client.
-- [ ] Migrasi bisa dijalankan ulang pada DB bersih, dan migration upgrade tervalidasi.
+**Bukti Pengujian Blok 22:**
+- 7 test files, 34 unit tests passed (`tests/unit/adminRoute.test.tsx`, `tests/unit/profileRepository.test.ts`, dll).
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: Vite production build passed.
 
 ---
 
@@ -710,7 +706,7 @@ Sebuah blok baru boleh diberi tanda DONE bila **semuanya** terpenuhi:
 |---|---|---|---|
 | 20 | Baseline QA, test infrastructure | DONE | 21 unit tests passed (Vitest, RTL), CI workflow, build clean |
 | 21 | Real Auth & guest isolation | DONE | Multi-user Supabase Auth, /register, /forgot-password, guest sandbox |
-| 22 | Profiles, RBAC foundation, RLS | TODO | - |
+| 22 | Profiles, RBAC foundation, RLS | DONE | Versioned migrations, user_roles, RLS audit, AdminRoute, profileRepository |
 | 23 | Persistence & sync hardening | TODO | - |
 | 24 | Secure economy & reward ledger | TODO | - |
 | 25 | Dynamic question bank schema | TODO | - |

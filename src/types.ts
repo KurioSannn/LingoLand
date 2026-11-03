@@ -1,6 +1,7 @@
 export type MissionStatus = "locked" | "available" | "active" | "completed" | "incomplete";
 export type LearningPathStatus = "completed" | "active" | "unlocked" | "locked" | "coming-soon";
 export type StoreCategory = "hair" | "top" | "bottom" | "shoes" | "accessory";
+export type UserRole = "user" | "moderator" | "admin";
 
 export interface DemoUser {
   id: string;
@@ -13,6 +14,9 @@ export interface DemoUser {
   hearts: number;
   streakDays: number;
   isGuest?: boolean;
+  role?: UserRole;
+  displayName?: string;
+  isPrivate?: boolean;
 }
 
 export interface AvatarConfig {
