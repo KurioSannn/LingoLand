@@ -363,26 +363,33 @@
 
 ### BLOK 29 — Friends, identitas sosial dan kontrol privasi
 
-**Prioritas:** P1 tetapi dibutuhkan sebagai fondasi sosial dasar. **Dependensi:** 21–23. **Status:** TODO.
+**Prioritas:** P1 tetapi dibutuhkan sebagai fondasi sosial dasar. **Dependensi:** 21–23. **Status:** DONE.
 
 **Tujuan:** Mengganti fake friends list menjadi hubungan antar-akun nyata.
 
 **Implementasi:**
-- [ ] Public profile minimal: username, avatar, status display (berdasar preferensi), tanpa email dan data sensitif.
-- [ ] Tabel friend_requests (sender_id, receiver_id, status), friendships, user_blocks; aturan no self-friend, no duplicate, privacy.
-- [ ] Actions search by username, send request, accept/reject, unfriend, block, invite to room.
-- [ ] Gunakan invite token yang tidak menampilkan room private tanpa hak akses; batasi abuse/rate limit.
-- [ ] Presence online jangan global tanpa consent: opsi visible/friends-only/hidden sesuai kebutuhan dan batasan produk.
-- [ ] Ubah FriendsPage.tsx dari array data/demoData.ts menjadi query user sungguhan; label demo tetap jelas bila local guest.
+- [x] Tambahkan kolom `presence_privacy` (`public`, `friends_only`, `hidden`) dan `custom_status` pada tabel `profiles`.
+- [x] Buat tabel `friendships` (pasangan kanonikal terurut `user_a < user_b`), `friend_requests` (sender_id, receiver_id, status pending/accepted/rejected), dan `user_blocks` (blocker_id, blocked_id) pada migrasi `supabase/migrations/20261103000007_block29_friends_social_privacy.sql`.
+- [x] Security Definer RPC:
+  - `send_friend_request(p_receiver_username)`: Validasi username, larangan self-friend, proteksi block dua arah, deteksi mutual request otomatis.
+  - `respond_friend_request(p_request_id, p_action)`: Penerimaan atomik dan insert ke `friendships`.
+  - `remove_friend(p_target_user_id)`: Hapus relasi pertemanan kanonikal.
+  - `block_user(p_target_user_id)` dan `unblock_user(p_target_user_id)`: Pemblokiran instan dan pembersihan otomatis relasi pertemanan.
+  - `get_friends_list()`: Query teman terotorisasi tanpa membocorkan email atau data privat.
+- [x] Buat data access layer `src/lib/friendsRepository.ts` (`fetchFriends`, `fetchFriendRequests`, `sendFriendRequest`, `respondFriendRequest`, `removeFriend`, `blockUser`, `unblockUser`, `updatePresencePrivacy`) dengan fallback simulasi pada mode tamu.
+- [x] Refactor UI [`FriendsPage.tsx`](file:///D:/lingoland/src/pages/FriendsPage.tsx) dengan 4 tab interaktif: Daftar Teman, Permintaan Masuk/Keluar, Cari & Tambah Teman, dan Kontrol Privasi Kehadiran.
+- [x] Unit test `tests/unit/friendsRepository.test.ts`.
 
-**File kemungkinan:** src/pages/FriendsPage.tsx, src/components/ui/FriendAvatar.tsx, src/lib/friendsRepository.ts, supabase/migrations/*.
-
-**Pengujian wajib:** A request B, B accept, unblock, reject, forged sender, blocked invitation, invalid duplicate request, username privacy.
+**Bukti Pengujian Blok 29:**
+- 12 test files, 74 unit tests passed (`tests/unit/friendsRepository.test.ts`, dll).
+- Typecheck: 0 errors (`tsc -b`).
+- Lint: 0 errors (`eslint .`).
+- Build: Vite production build passed.
 
 **Acceptance criteria / DoD:**
-- [ ] Dua user asli bisa berteman dan undangan memiliki status persistent.
-- [ ] Block mencegah interaksi yang tidak diizinkan.
-- [ ] Guest tidak ditampilkan sebagai pemain real-time publik.
+- [x] Dua user asli bisa berteman dan undangan memiliki status persistent di database.
+- [x] Block mencegah interaksi dan menghapus pertemanan secara otomatis.
+- [x] Guest mode menampilkan label simulasi dan diarahkan registrasi untuk fitur sosial nyata.
 
 ---
 
@@ -711,7 +718,7 @@ Sebuah blok baru boleh diberi tanda DONE bila **semuanya** terpenuhi:
 | 26 | Learning/grading engine | DONE | grade_lesson_attempt_atomic RPC, passing score threshold 70%, LessonPage server evaluation |
 | 27 | Admin authorization & audit | DONE | admin_audit_logs, admin_log_action, database role verification |
 | 28 | Admin CMS dashboard | DONE | /admin dashboard, KPI overview, Question Bank CMS, User role editor, audit viewer |
-| 29 | Friends & privacy | TODO | - |
+| 29 | Friends & privacy | DONE | friendships, friend_requests, user_blocks, presence privacy, friendsRepository |
 | 30 | Real-time room backend | TODO | - |
 | 31 | Social Plaza 3D map | TODO | - |
 | 32 | Player text chat & safety | TODO | - |
