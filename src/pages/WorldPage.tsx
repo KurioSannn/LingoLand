@@ -115,6 +115,7 @@ export function WorldPage() {
               <Suspense fallback={<WorldLoading />}>
                 <MiniHomeScene
                   avatar={state.avatar}
+                  playerName={state.user.name || "Kamu"}
                   movementEnabled={!isConversing}
                   getDirection={getDirection}
                   nearestNpcId={nearestNpc?.id ?? null}
@@ -129,7 +130,7 @@ export function WorldPage() {
           <div className="world-hud-top">
             <div className="world-hud-left">
               <span className="world-room-name">Mini Home</span>
-              <Badge tone="prototype">Prototype Interaksi</Badge>
+              <Badge tone="info">Ruang Latihan Pribadi</Badge>
             </div>
             <div className="flex items-center gap-2">
               <button

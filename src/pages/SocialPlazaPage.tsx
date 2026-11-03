@@ -97,7 +97,7 @@ export function SocialPlazaPage() {
   });
 
   // Rooms & Navigation
-  const activeRoomId = routeRoomId || "00000000-0000-0000-0000-000000000001";
+  const activeRoomId = routeRoomId || "plaza-lobby-1";
   const [availableRooms, setAvailableRooms] = useState<WorldRoomSummary[]>([]);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [currentRoomName, setCurrentRoomName] = useState("Plaza Utama");
@@ -346,7 +346,7 @@ export function SocialPlazaPage() {
                   {totalActivePlayers} pemain aktif
                 </span>
                 {currentUser.isGuest ? (
-                  <Badge tone="prototype">Mode Tamu (Simulasi)</Badge>
+                  <Badge tone="neutral">Mode Tamu (Offline)</Badge>
                 ) : (
                   <Badge tone="success">Multiplayer Live</Badge>
                 )}

@@ -143,9 +143,9 @@ export function FriendsPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold text-neutral-950">Teman Belajar</h1>
             {isGuest ? (
-              <Badge tone="prototype">Mode Tamu (Simulasi)</Badge>
+              <Badge tone="neutral">Mode Tamu (Offline)</Badge>
             ) : (
-              <Badge tone="success">Relasi Akun Nyata</Badge>
+              <Badge tone="success">Terhubung Cloud</Badge>
             )}
           </div>
           <p className="mt-2 text-neutral-500">
@@ -247,7 +247,7 @@ export function FriendsPage() {
                     <Button
                       variant="secondary"
                       className="w-full text-xs"
-                      onClick={() => setToastMessage(`Undangan latihan terkirim ke @${friend.username} (fitur room multiplayer siap di Blok 30/31).`)}
+                      onClick={() => setToastMessage(`Undangan latihan terkirim ke @${friend.username} (ajak bertemu di Social Plaza).`)}
                     >
                       <UserPlus size={14} /> Undang ke Room
                     </Button>

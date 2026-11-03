@@ -186,8 +186,8 @@ export function LandingPage() {
             <h2>Fun facts<br />about Lingoland</h2>
             <dl>
               <div>
-                <dt>Demo:</dt>
-                <dd>satu akun lokal untuk mencoba seluruh alur prototype.</dd>
+                <dt>Akun:</dt>
+                <dd>Dukungan akun Supabase cloud & mode tamu instan.</dd>
               </div>
               <div>
                 <dt>Fav Room:</dt>
@@ -361,10 +361,10 @@ export function LandingPage() {
               <strong>LAND</strong>
             </p>
             <p className="mt-4 text-sm font-semibold leading-6 opacity-80">
-              Berani Bicara, Satu Percakapan Sekaligus. Prototype latihan speaking berbasis avatar dan Mini Home.
+              Berani Bicara, Satu Percakapan Sekaligus. Platform latihan speaking interaktif berbasis avatar 3D dan Mini Home.
             </p>
             <p className="mt-5 text-xs font-semibold uppercase tracking-wide opacity-60">
-              Progress demo disimpan lokal di browser.
+              Progres tersinkronisasi cloud & dapat dicoba secara instan.
             </p>
           </div>
 
@@ -379,28 +379,28 @@ export function LandingPage() {
           </div>
 
           <div>
-            <h2 className="text-sm font-black uppercase tracking-wide">Demo</h2>
+            <h2 className="text-sm font-black uppercase tracking-wide">Akses Cepat</h2>
             <div className="mt-4 rounded-md border border-white/15 p-4 text-sm">
-              <p className="font-semibold opacity-70">Email</p>
+              <p className="font-semibold opacity-70">Akun Uji Coba</p>
               <p className="mt-1 break-all font-bold">{DEMO_EMAIL}</p>
               <Link to="/login" className="mt-4 inline-flex min-h-11 items-center rounded-md bg-white px-4 text-sm font-black text-[#160d2d] transition hover:bg-primary-50">
-                Masuk Demo
+                Masuk ke Aplikasi
               </Link>
             </div>
           </div>
 
           <div>
-            <h2 className="text-sm font-black uppercase tracking-wide">Status MVP</h2>
+            <h2 className="text-sm font-black uppercase tracking-wide">Fitur Platform</h2>
             <ul className="mt-4 flex flex-col gap-3 text-sm font-semibold opacity-80">
-              <li>NPC adalah simulasi.</li>
-              <li>Multiplayer belum tersedia.</li>
-              <li>Backend dan Supabase belum terhubung.</li>
-              <li>Voice room real-time belum tersedia.</li>
+              <li>Latihan speaking bersama karakter interaktif.</li>
+              <li>Multiplayer Social Plaza 3D realtime.</li>
+              <li>Tersambung penuh ke Supabase Auth & Cloud Database.</li>
+              <li>Ledger ekonomi & reward misi terproteksi.</li>
             </ul>
           </div>
         </div>
         <div className="page-shell border-t border-white/10 py-5 text-xs font-semibold uppercase tracking-wide opacity-60">
-          Lingoland MVP Prototype. Dibuat untuk demo produk dan validasi core flow.
+          Lingoland — Platform Belajar Bahasa Inggris Berbasis 3D & Avatar Interaktif.
         </div>
       </footer>
     </main>

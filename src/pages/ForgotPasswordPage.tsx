@@ -41,7 +41,7 @@ export function ForgotPasswordPage() {
     <main className="min-h-screen bg-neutral-50">
       <section className="page-shell grid min-h-screen items-center gap-8 lg:grid-cols-2">
         <Card className="bg-primary-50">
-          <Badge tone="info">Blok 21 Auth</Badge>
+          <Badge tone="info">Keamanan Akun</Badge>
           <h1 className="mt-4 text-3xl font-bold text-neutral-950">Lupa Password?</h1>
           <p className="mt-3 text-neutral-600">
             Jangan khawatir! Masukkan alamat email akun Lingoland kamu, dan kami akan mengirimkan tautan untuk mengatur ulang password kamu.

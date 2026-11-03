@@ -61,7 +61,7 @@ function getItemState(option: AvatarOption, draft: AvatarConfig, inventory: stri
 function stateBadge(state: ItemState) {
   if (state === "selected") return <Badge tone="success">Selected</Badge>;
   if (state === "owned") return <Badge tone="info">Owned</Badge>;
-  if (state === "purchasable") return <Badge tone="warning">Blok 8 Store</Badge>;
+  if (state === "purchasable") return <Badge tone="warning">Beli di Toko</Badge>;
   if (state === "insufficient") return <Badge tone="danger">Koin tidak cukup</Badge>;
   return <Badge tone="neutral">Locked</Badge>;
 }
@@ -116,10 +116,10 @@ export function AvatarPage() {
     <section className="page-shell">
       <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
-          <Badge tone="prototype">Blok 7 Avatar Customizer</Badge>
+          <Badge tone="info">Kustomisasi Avatar</Badge>
           <h1 className="mt-4 text-3xl font-bold text-neutral-950">Atur Avatar</h1>
           <p className="mt-2 max-w-2xl text-neutral-500">
-            Pilih item yang sudah dimiliki, simpan konfigurasi, lalu reload untuk memastikan avatar tetap tersimpan di localStorage.
+            Pilih item pakaian dan gaya rambut yang sudah kamu miliki, lalu simpan untuk memperbarui tampilan avatarmu di dunia Lingoland.
           </p>
         </div>
         <div className="rounded-md border border-neutral-200 bg-white px-4 py-3 text-sm">
@@ -235,7 +235,7 @@ export function AvatarPage() {
           </div>
 
           <div className="mt-6 rounded-md bg-primary-50 p-4 text-sm text-primary-600">
-            Item berbayar belum bisa dipakai langsung di Blok 7. Pembelian lokal pakai koin demo dikerjakan di Blok 8 Store.
+            Item yang terkunci dapat dibeli menggunakan koin melalui menu Toko Avatar.
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">

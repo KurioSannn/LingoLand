@@ -104,10 +104,10 @@ export function StorePage() {
     <section className="page-shell">
       <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
-          <Badge tone="prototype">Blok 8 Store Demo</Badge>
+          <Badge tone="info">Katalog Toko</Badge>
           <h1 className="mt-4 text-3xl font-bold text-neutral-950">Toko Avatar</h1>
           <p className="mt-2 max-w-2xl text-neutral-500">
-            Gunakan koin demo untuk membuka item avatar. Tidak ada pembayaran uang asli.
+            Gunakan koin latihan untuk membuka item avatar baru. Tidak ada pembayaran uang asli.
           </p>
         </div>
         <div className="grid gap-2 rounded-md border border-neutral-200 bg-white px-4 py-3 text-sm sm:grid-cols-2">

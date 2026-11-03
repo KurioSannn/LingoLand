@@ -16,6 +16,7 @@ import { LowPolyAvatar } from "../three/LowPolyAvatar";
 
 interface MiniHomeSceneProps {
   avatar: AvatarConfig;
+  playerName?: string;
   movementEnabled: boolean;
   getDirection: () => { x: number; z: number };
   nearestNpcId: string | null;
@@ -315,10 +316,11 @@ function Floors() {
 
 function PlayerRig({
   avatar,
+  playerName = "Kamu",
   movementEnabled,
   getDirection,
   onNearestNpc,
-}: Pick<MiniHomeSceneProps, "avatar" | "movementEnabled" | "getDirection" | "onNearestNpc">) {
+}: Pick<MiniHomeSceneProps, "avatar" | "playerName" | "movementEnabled" | "getDirection" | "onNearestNpc">) {
   const rigRef = useRef<Group>(null);
   const positionRef = useRef<PlayerPosition>({ ...PLAYER_SPAWN });
   const angleRef = useRef(Math.PI);
@@ -366,7 +368,7 @@ function PlayerRig({
     <group ref={rigRef} position={[PLAYER_SPAWN.x, 0, PLAYER_SPAWN.z]}>
       <LowPolyAvatar avatar={avatar} walking={isWalking} />
       <Html position={[0, 2.35, 0]} center zIndexRange={[10, 0]}>
-        <span className="npc-label npc-label-player">Raka Demo</span>
+        <span className="npc-label npc-label-player">{playerName}</span>
       </Html>
     </group>
   );
@@ -396,7 +398,7 @@ function NpcGroup({ nearestNpcId }: { nearestNpcId: string | null }) {
   );
 }
 
-export function MiniHomeScene({ avatar, movementEnabled, getDirection, nearestNpcId, onNearestNpc, frameloop }: MiniHomeSceneProps) {
+export function MiniHomeScene({ avatar, playerName, movementEnabled, getDirection, nearestNpcId, onNearestNpc, frameloop }: MiniHomeSceneProps) {
   return (
     <Canvas
       className="world-canvas-inner"
@@ -415,7 +417,13 @@ export function MiniHomeScene({ avatar, movementEnabled, getDirection, nearestNp
       <StudyArea />
       <GardenArea />
       <NpcGroup nearestNpcId={nearestNpcId} />
-      <PlayerRig avatar={avatar} movementEnabled={movementEnabled} getDirection={getDirection} onNearestNpc={onNearestNpc} />
+      <PlayerRig
+        avatar={avatar}
+        playerName={playerName}
+        movementEnabled={movementEnabled}
+        getDirection={getDirection}
+        onNearestNpc={onNearestNpc}
+      />
     </Canvas>
   );
 }
