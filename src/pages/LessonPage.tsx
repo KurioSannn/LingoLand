@@ -6,7 +6,8 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useDemoStorage } from "../hooks/useDemoStorage";
-import { submitLessonAttempt, type LessonGradeResult } from "../lib/learningRepository";
+import { fetchLessonById, submitLessonAttempt, type LessonGradeResult } from "../lib/learningRepository";
+import type { LessonUnit } from "../types";
 
 function shuffle<T>(items: T[]): T[] {
   const array = [...items];
@@ -20,9 +21,27 @@ function shuffle<T>(items: T[]): T[] {
 export function LessonPage() {
   const { unitId } = useParams<{ unitId: string }>();
   const navigate = useNavigate();
-  const { state, lessonUnitSummaries, completeLesson } = useDemoStorage();
+  const { state, lessonUnitSummaries, completeLesson, setActiveMission } = useDemoStorage();
 
   const summary = lessonUnitSummaries.find((entry) => entry.unit.id === unitId) ?? null;
+  const [remoteUnit, setRemoteUnit] = useState<LessonUnit | null>(null);
+
+  useEffect(() => {
+    if (!unitId) return;
+    let cancelled = false;
+    fetchLessonById(unitId)
+      .then((loaded) => {
+        if (!cancelled && loaded && loaded.exercises.length > 0) {
+          setRemoteUnit(loaded);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [unitId]);
+
+  const activeUnit = remoteUnit ?? summary?.unit ?? null;
 
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
@@ -36,9 +55,9 @@ export function LessonPage() {
   const [gradeResult, setGradeResult] = useState<LessonGradeResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
-  const [wasAlreadyCompleted] = useState(() => summary?.status === "completed");
+  const [wasAlreadyCompleted] = useState(() => summary?.status === "completed" || (unitId ? state.completedLessonIds.includes(unitId) : false));
 
-  const currentExercise = summary?.unit.exercises[exerciseIndex] ?? null;
+  const currentExercise = activeUnit?.exercises[exerciseIndex] ?? null;
 
   useEffect(() => {
     if (!currentExercise) return;
@@ -51,7 +70,7 @@ export function LessonPage() {
     setIsCorrect(false);
   }, [currentExercise]);
 
-  if (!summary) {
+  if (!activeUnit) {
     return (
       <section className="page-shell">
         <Card className="mx-auto max-w-md text-center">
@@ -62,28 +81,31 @@ export function LessonPage() {
     );
   }
 
-  if (summary.status === "locked") {
+  if (summary?.status === "locked") {
     return (
       <section className="page-shell">
         <Card className="mx-auto max-w-md text-center">
           <Lock className="mx-auto text-neutral-400" size={32} aria-hidden />
           <h1 className="mt-4 text-xl font-bold text-neutral-950">Lesson terkunci</h1>
-          <p className="mt-2 text-neutral-500">Selesaikan lesson sebelumnya dulu untuk membuka {summary.unit.title}.</p>
+          <p className="mt-2 text-neutral-500">Selesaikan lesson sebelumnya dulu untuk membuka {activeUnit.title}.</p>
           <Button className="mt-4" onClick={() => navigate("/app/lessons")}>Kembali ke Learning Path</Button>
         </Card>
       </section>
     );
   }
 
-  // Captured as a local so closures below (goNext, etc.) keep TypeScript's null
-  // narrowing — a captured outer `const` isn't narrowed inside nested function
-  // declarations since they could run after a re-render.
-  const unit = summary.unit;
+  const unit = activeUnit;
   const totalExercises = unit.exercises.length;
   const isLastExercise = exerciseIndex === totalExercises - 1;
   const canCheck = currentExercise?.type === "multiple-choice"
     ? selectedOptionId !== null
     : answerOrder.length > 0 && answerOrder.length === (currentExercise?.wordBank?.length ?? 0);
+
+  const hasLocalAnswerKey = Boolean(
+    currentExercise?.type === "multiple-choice"
+      ? currentExercise.correctOptionId
+      : currentExercise?.correctOrder && currentExercise.correctOrder.length > 0,
+  );
 
   function selectOption(optionId: string) {
     if (checked) return;
@@ -113,13 +135,16 @@ export function LessonPage() {
     const userAns = currentExercise.type === "multiple-choice" ? selectedOptionId! : answerOrder;
     setAnswers((prev) => ({ ...prev, [currentExercise.id]: userAns }));
 
-    const correct = currentExercise.type === "multiple-choice"
-      ? selectedOptionId === currentExercise.correctOptionId
-      : JSON.stringify(answerOrder) === JSON.stringify(currentExercise.correctOrder);
-
-    setIsCorrect(correct);
+    if (hasLocalAnswerKey) {
+      const correct = currentExercise.type === "multiple-choice"
+        ? selectedOptionId === currentExercise.correctOptionId
+        : JSON.stringify(answerOrder) === JSON.stringify(currentExercise.correctOrder);
+      setIsCorrect(correct);
+      if (correct) setCorrectCount((count) => count + 1);
+    } else {
+      setIsCorrect(true);
+    }
     setChecked(true);
-    if (correct) setCorrectCount((count) => count + 1);
   }
 
   async function goNext() {
@@ -187,6 +212,13 @@ export function LessonPage() {
     setIsFinished(false);
   }
 
+  function goTo3DPractice() {
+    if (unit.relatedMissionId) {
+      setActiveMission(unit.relatedMissionId);
+    }
+    navigate("/app/world");
+  }
+
   if (isFinished) {
     const passed = gradeResult?.passed ?? false;
     const score = gradeResult?.score ?? Math.round((correctCount / totalExercises) * 100);
@@ -216,13 +248,30 @@ export function LessonPage() {
               <Badge tone="warning">Batas minimum kelulusan: 70%</Badge>
             )}
           </div>
-          {!passed && (
+          {!passed ? (
             <p className="mt-4 text-sm text-neutral-600">
               Jangan berkecil hati! Ulangi latihan ini untuk menguasai kosakata dan membuka bab berikutnya.
             </p>
+          ) : (
+            <div className="mt-5 rounded-xl border border-primary-200 bg-primary-50 p-4 text-left">
+              <p className="text-xs font-bold uppercase tracking-wider text-primary-700">
+                Langkah Selanjutnya: Praktik Animasi 3D
+              </p>
+              <p className="mt-1 text-sm text-neutral-700">
+                Kosakata dari bab <strong>{unit.title}</strong> ini sekarang siap kamu praktikkan langsung bersama karakter NPC di dalam <strong>Mini Home 3D</strong>!
+              </p>
+            </div>
           )}
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Button onClick={() => navigate("/app/lessons")}>Kembali ke Learning Path</Button>
+            {passed ? (
+              <Button onClick={goTo3DPractice}>
+                <Sparkles size={16} aria-hidden />
+                Praktik di Dunia 3D (Mini Home)
+              </Button>
+            ) : null}
+            <Button variant="secondary" onClick={() => navigate("/app/lessons")}>
+              Kembali ke Learning Path
+            </Button>
             <Button variant={passed ? "secondary" : "primary"} onClick={restartLesson}>
               <RotateCcw size={16} aria-hidden />
               {passed ? "Latihan Ulang" : "Coba Lagi"}
@@ -241,7 +290,7 @@ export function LessonPage() {
       </button>
 
       <Card className="mx-auto max-w-2xl">
-        <Badge tone="prototype">Lesson</Badge>
+        <Badge tone="info">Modul Latihan</Badge>
         <h1 className="mt-3 text-2xl font-bold text-neutral-950">{unit.title}</h1>
         <p className="mt-1 text-sm text-neutral-500">{unit.description}</p>
 
@@ -257,10 +306,10 @@ export function LessonPage() {
               <div className="mt-4 flex flex-col gap-2" role="radiogroup" aria-label={currentExercise.prompt}>
                 {currentExercise.options?.map((option) => {
                   const isSelected = selectedOptionId === option.id;
-                  const isCorrectOption = option.id === currentExercise.correctOptionId;
+                  const isCorrectOption = hasLocalAnswerKey && option.id === currentExercise.correctOptionId;
                   let tone = "border-neutral-200 bg-white";
-                  if (checked && isCorrectOption) tone = "border-success-500 bg-success-100";
-                  else if (checked && isSelected && !isCorrectOption) tone = "border-danger-500 bg-danger-100";
+                  if (checked && hasLocalAnswerKey && isCorrectOption) tone = "border-success-500 bg-success-100";
+                  else if (checked && hasLocalAnswerKey && isSelected && !isCorrectOption) tone = "border-danger-500 bg-danger-100";
                   else if (isSelected) tone = "border-primary-500 bg-primary-50";
 
                   return (
@@ -323,23 +372,33 @@ export function LessonPage() {
             ) : null}
 
             {checked ? (
-              <div
-                role="status"
-                className={`mt-4 flex items-start gap-2 rounded-md p-3 text-sm font-medium ${
-                  isCorrect ? "bg-success-100 text-green-800" : "bg-danger-100 text-red-800"
-                }`}
-              >
-                {isCorrect ? <CheckCircle2 size={18} className="mt-0.5 shrink-0" aria-hidden /> : <XCircle size={18} className="mt-0.5 shrink-0" aria-hidden />}
-                <span>
-                  {isCorrect
-                    ? "Benar!"
-                    : `Kurang tepat. Jawaban yang benar: ${
-                        currentExercise.type === "multiple-choice"
-                          ? currentExercise.options?.find((option) => option.id === currentExercise.correctOptionId)?.label
-                          : currentExercise.correctOrder?.join(" ")
-                      }`}
-                </span>
-              </div>
+              hasLocalAnswerKey ? (
+                <div
+                  role="status"
+                  className={`mt-4 flex items-start gap-2 rounded-md p-3 text-sm font-medium ${
+                    isCorrect ? "bg-success-100 text-green-800" : "bg-danger-100 text-red-800"
+                  }`}
+                >
+                  {isCorrect ? <CheckCircle2 size={18} className="mt-0.5 shrink-0" aria-hidden /> : <XCircle size={18} className="mt-0.5 shrink-0" aria-hidden />}
+                  <span>
+                    {isCorrect
+                      ? "Benar!"
+                      : `Kurang tepat. Jawaban yang benar: ${
+                          currentExercise.type === "multiple-choice"
+                            ? currentExercise.options?.find((option) => option.id === currentExercise.correctOptionId)?.label
+                            : currentExercise.correctOrder?.join(" ")
+                        }`}
+                  </span>
+                </div>
+              ) : (
+                <div
+                  role="status"
+                  className="mt-4 flex items-start gap-2 rounded-md bg-primary-50 p-3 text-sm font-medium text-primary-700"
+                >
+                  <CheckCircle2 size={18} className="mt-0.5 shrink-0" aria-hidden />
+                  <span>Jawaban disimpan. Evaluasi skor akhir dilakukan secara otomatis di akhir modul.</span>
+                </div>
+              )
             ) : null}
 
             <div className="mt-6 flex justify-end">

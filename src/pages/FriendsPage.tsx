@@ -56,7 +56,7 @@ export function FriendsPage() {
     setLoading(true);
     try {
       if (activeTab === "list") {
-        const f = await fetchFriends(isGuest);
+        const f = isGuest ? [] : await fetchFriends(false);
         setFriendsList(f);
       } else if (activeTab === "requests") {
         const reqs = await fetchFriendRequests(isGuest);
