@@ -4,6 +4,7 @@ import {
   claimMissionReward,
   completeLessonReward,
   fetchWalletTransactions,
+  verifyMissionObjective,
 } from "../../src/lib/economyRepository";
 import { supabase } from "../../src/lib/supabaseClient";
 
@@ -20,6 +21,51 @@ type FromReturn = ReturnType<NonNullable<typeof supabase>["from"]>;
 describe("economyRepository", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe("verifyMissionObjective", () => {
+    it("evaluates mission input locally in guest mode without calling RPC", async () => {
+      const res = await verifyMissionObjective({
+        missionId: "intro",
+        userInput: "My name is Raka.",
+        currentCompletedIds: [],
+        isGuest: true,
+      });
+
+      expect(res.ok).toBe(true);
+      expect(res.completedObjectiveIds).toContain("name");
+      expect(res.allCompleted).toBe(false);
+      expect(supabase!.rpc).not.toHaveBeenCalled();
+    });
+
+    it("calls verify_mission_objective_atomic RPC for authenticated user", async () => {
+      vi.mocked(supabase!.rpc).mockResolvedValueOnce({
+        data: {
+          ok: true,
+          mission_id: "intro",
+          completed_objective_ids: ["name", "origin", "interest"],
+          total_objectives: 3,
+          all_completed: true,
+          status: "completed",
+        },
+        error: null,
+      } as unknown as ReturnType<NonNullable<typeof supabase>["rpc"]>);
+
+      const res = await verifyMissionObjective({
+        missionId: "intro",
+        userInput: "I like playing games.",
+        currentCompletedIds: ["name", "origin"],
+        isGuest: false,
+      });
+
+      expect(supabase!.rpc).toHaveBeenCalledWith("verify_mission_objective_atomic", {
+        p_mission_id: "intro",
+        p_user_input: "I like playing games.",
+      });
+      expect(res.ok).toBe(true);
+      expect(res.allCompleted).toBe(true);
+      expect(res.completedObjectiveIds).toEqual(["name", "origin", "interest"]);
+    });
   });
 
   describe("claimMissionReward", () => {
@@ -83,6 +129,28 @@ describe("economyRepository", () => {
 
       expect(result.ok).toBe(false);
       expect(result.alreadyClaimed).toBe(true);
+    });
+
+    it("rejects claim when server reports mission objectives are incomplete", async () => {
+      vi.mocked(supabase!.rpc).mockResolvedValueOnce({
+        data: {
+          ok: false,
+          code: "MISSION_INCOMPLETE",
+          message: "Seluruh objektif percakapan misi harus diselesaikan terlebih dahulu sebelum mengklaim hadiah.",
+          already_claimed: false,
+        },
+        error: null,
+      } as unknown as ReturnType<NonNullable<typeof supabase>["rpc"]>);
+
+      const result = await claimMissionReward({
+        missionId: "intro",
+        fallbackReward: { xp: 50, coins: 20, title: "Perkenalan Diri" },
+        isGuest: false,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.alreadyClaimed).toBe(false);
+      expect(result.gainedCoins).toBeUndefined();
     });
 
     it("throws error when RPC encounters database failure", async () => {
@@ -191,33 +259,18 @@ describe("economyRepository", () => {
       expect(supabase!.rpc).not.toHaveBeenCalled();
     });
 
-    it("calls complete_lesson_atomic RPC for remote user", async () => {
-      vi.mocked(supabase!.rpc).mockResolvedValueOnce({
-        data: {
-          ok: true,
-          message: "Lesson selesai!",
-          gained_xp: 15,
-          xp: 15,
-          level: 1,
-        },
-        error: null,
-      } as unknown as ReturnType<NonNullable<typeof supabase>["rpc"]>);
+    it("blocks direct client-score completion for authenticated remote users", async () => {
+      await expect(
+        completeLessonReward({
+          lessonUnitId: "lesson-intro",
+          score: 100,
+          fallbackReward: { xp: 15, title: "Perkenalan Diri" },
+          alreadyCompleted: false,
+          isGuest: false,
+        }),
+      ).rejects.toThrow(/grade_lesson_attempt_atomic/i);
 
-      const result = await completeLessonReward({
-        lessonUnitId: "lesson-intro",
-        score: 100,
-        fallbackReward: { xp: 15, title: "Perkenalan Diri" },
-        alreadyCompleted: false,
-        isGuest: false,
-      });
-
-      expect(supabase!.rpc).toHaveBeenCalledWith("complete_lesson_atomic", {
-        p_lesson_unit_id: "lesson-intro",
-        p_score: 100,
-      });
-      expect(result.ok).toBe(true);
-      expect(result.gainedXp).toBe(15);
-      expect(result.xp).toBe(15);
+      expect(supabase!.rpc).not.toHaveBeenCalled();
     });
   });
 

@@ -6,7 +6,7 @@ Dokumen ini menjelaskan cara men-deploy Lingoland (Vite SPA + Supabase) dan menj
 
 | Environment | Frontend (Vercel) | Supabase project | Catatan |
 |---|---|---|---|
-| Local dev | `npm run dev` | project dev / kosong (mode demo) | Tanpa env → app jalan mode demo/tamu |
+| Local dev | `npm run dev` | project dev / kosong (mode tamu) | Tanpa env → app jalan mode tamu lokal |
 | Preview / Staging | Vercel Preview | project **staging** terpisah | Dipakai untuk uji migrasi + E2E manual |
 | Production | Vercel Production | project **prod** | Jangan dipakai untuk automated test |
 
@@ -30,7 +30,7 @@ VITE_SUPABASE_ANON_KEY=   # anon / publishable key SAJA
 
 ## 3. Urutan migrasi database
 
-Migrasi ada di `supabase/migrations/` dan **harus diterapkan berurutan** pada DB bersih:
+Migrasi ada di `supabase/migrations/` dan **harus diterapkan berurutan** (atau sekaligus melalui bundel lengkap `supabase/schema.sql` di Supabase SQL Editor):
 
 | # | File | Isi |
 |---|---|---|
@@ -39,13 +39,17 @@ Migrasi ada di `supabase/migrations/` dan **harus diterapkan berurutan** pada DB
 | 2 | `20261103000002_block23_lesson_progress.sql` | `lesson_progress` |
 | 3 | `20261103000003_block24_economy_ledger_rpc.sql` | wallet ledger, RPC ekonomi |
 | 4 | `20261103000004_block25_curriculum_question_bank.sql` | kurikulum, bank soal, attempts |
-| 5 | `20261103000005_block26_server_grading_engine.sql` | grading server-side |
+| 5 | `20261103000005_block26_server_grading_engine.sql` | grading server-side awal |
 | 6 | `20261103000006_block27_admin_audit_cms.sql` | audit log admin, CMS |
 | 7 | `20261103000007_block29_friends_social_privacy.sql` | friends, requests, blocks, privasi |
 | 8 | `20261103000008_block30_multiplayer_rooms.sql` | world/room/membership |
 | 9 | `20261103000009_block32_player_chat_moderation_practice.sql` | reports, mutes |
+| 10 | `20261103000010_fix_lesson_reward_security.sql` | cabut/hapus `complete_lesson_atomic`, perketat `grade_lesson_attempt_atomic` (0-question guard, row lock, authoritative XP return) |
+| 11 | `20261103000011_fix_lesson_progress_permissions.sql` | cabut direct write RLS pada `lesson_progress`, `claimed_rewards`, `inventory_items`, `mission_progress`; validasi kepemilikan avatar |
+| 12 | `20261103000012_fix_room_membership_rls.sql` | hapus rekursi RLS `room_memberships` dengan helper `SECURITY DEFINER`, kunci `world_rooms` `FOR UPDATE` saat join |
+| 13 | `20261103000013_harden_mission_reward_validation.sql` | tabel `mission_objective_definitions`, RPC `verify_mission_objective_atomic`, wajib selesai objektif sebelum `claim_mission_reward_atomic` |
 
-Terapkan:
+Terapkan via Supabase CLI:
 
 ```bash
 supabase link --project-ref <staging-ref>
@@ -55,11 +59,14 @@ supabase link --project-ref <prod-ref>
 supabase db push
 ```
 
+Atau melalui **Supabase SQL Editor**:
+- Jika database baru atau baru memiliki sebagian tabel, jalankan seluruh isi `supabase/schema.sql` (idempotent, mencakup migrasi `0`–`13`).
+- Jika migrasi `0`–`9` sudah pernah dijalankan sebelumnya, jalankan migrasi `10`–`13` secara berurutan di SQL Editor.
+
 ### Backup & rollback
 
 - **Sebelum** `db push` ke prod: ambil backup (Supabase Dashboard → Database → Backups, atau `supabase db dump -f backup.sql`).
-- Migrasi ini **tidak otomatis reversible**. Strategi: *forward-fix* (migrasi baru yang memperbaiki) atau restore backup. Jangan edit file migrasi yang sudah diterapkan.
-- Latih restore ke project staging minimal sekali sebelum rilis besar.
+- Migrasi menggunakan strategi **forward-only** (jangan menulis ulang migrasi yang sudah diterapkan di prod).
 
 ## 4. Edge Function
 
@@ -67,29 +74,29 @@ supabase db push
 supabase functions deploy avatar-chat --project-ref <ref>
 ```
 
-Pastikan `GEMINI_API_KEY` sudah diset. Tanpa secret, fungsi harus gagal aman (frontend punya fallback).
+Pastikan `GEMINI_API_KEY` sudah diset. Tanpa secret, fungsi gagal aman dan frontend menggunakan respons fallback lokal.
 
 ## 5. Deploy frontend (Vercel)
 
 - Build command: `npm run build`, output: `dist`.
 - `vercel.json` sudah memiliki SPA rewrite `/(.*) → /index.html`, sehingga deep-link berikut valid:
   `/app/world`, `/app/plaza`, `/app/plaza/:roomId`, `/app/friends`, `/admin`.
-- CI (`.github/workflows/ci.yml`): lint → typecheck → vitest → build pada setiap push/PR ke `main`. Merge hanya jika hijau.
+- CI (`.github/workflows/ci.yml`): lint → typecheck → vitest → build pada setiap push/PR ke `main`.
 
-## 6. Smoke test pasca-deploy
+## 6. Smoke test pasca-deploy (2–5 pemain nyata)
 
-1. Buka `/`, login akun test A dan B (2 browser/profil berbeda).
-2. Selesaikan 1 lesson → XP/koin berubah; refresh → data tetap.
-3. Beli 1 item → saldo berkurang, item ada di avatar.
-4. A kirim friend request, B terima.
-5. A & B masuk `/app/plaza` (setujui pedoman) → saling melihat avatar; kirim chat; keluar → avatar hilang ≤ ~8 detik.
-6. Akun admin: buka `/admin` → akses diterima; akun biasa → ditolak.
-7. Deep-link refresh pada `/app/plaza` dan `/admin` tidak 404.
+1. Buka `/`, registrasi/login akun nyata A dan B di dua browser berbeda.
+2. Selesaikan 1 lesson di `/app/lessons` → skor dihitung oleh `grade_lesson_attempt_atomic`, XP bertambah satu kali; ulangi lesson yang sama → tidak ada XP ganda.
+3. Selesaikan percakapan NPC di `/app/world` → objektif diverifikasi oleh `verify_mission_objective_atomic` dan klaim hadiah berhasil satu kali.
+4. Beli 1 item di `/app/store` → saldo berkurang dan item dapat dipasang di `/app/avatar`.
+5. A kirim friend request ke username B di `/app/friends`, B terima.
+6. A & B masuk `/app/plaza` (setujui pedoman) → `join_world_room` sukses, kedua avatar saling terlihat dan bergerak secara real-time, kirim pesan chat, lalu keluar → avatar hilang ≤ ~8 detik.
+7. Akun admin: buka `/admin` → tambah/ubah soal dan verifikasi soal tampil di Learning Path.
 8. Cek bundle: `grep -r "service_role" dist/` harus kosong.
 
 ## 7. Staged rollout
 
-Internal (tim) → tester terbatas → publik. Pantau di tiap tahap: error auth, kegagalan write, anomali reward/koin, pemakaian Realtime (koneksi & pesan), jumlah laporan moderasi.
+Internal (tim) → demo 2–5 pemain → tester terbatas → publik. Pantau error auth, kegagalan RPC, dan koneksi Realtime.
 
 ## 8. Feature flags — status jujur
 
@@ -97,8 +104,6 @@ Saat ini **belum ada** sistem feature flag di kode. Mekanisme penonaktifan yang 
 
 | Fitur | Cara menonaktifkan sekarang |
 |---|---|
-| Plaza / chat | Hapus route `plaza` di `src/App.tsx` + redeploy (atau revert commit Blok 31–32) |
+| Plaza / chat | Nonaktifkan status room di `world_rooms` (`status = 'closed'`) atau hapus route `plaza` di `src/App.tsx` |
 | Admin | Cabut role admin di `user_roles`; route `/admin` dilindungi `AdminRoute` |
-| Seluruh backend | Hapus env `VITE_SUPABASE_*` di Vercel → app kembali ke mode demo (lihat `ROLLBACK.md`) |
-
-Rekomendasi lanjutan: tambah flag `VITE_FEATURE_PLAZA`, `VITE_FEATURE_CHAT`, dll. (default off di prod). Ini item backlog, bukan klaim yang sudah selesai.
+| Seluruh backend | Hapus env `VITE_SUPABASE_*` di Vercel → app kembali ke mode tamu lokal (lihat `ROLLBACK.md`) |

@@ -762,10 +762,10 @@ Sebuah blok baru boleh diberi tanda DONE bila **semuanya** terpenuhi:
 | 28 | Admin CMS dashboard | DONE | /admin dashboard, KPI overview, Question Bank CMS, User role editor, audit viewer |
 | 29 | Friends & privacy | DONE | friendships, friend_requests, user_blocks, presence privacy, friendsRepository |
 | 30 | Real-time room backend | DONE | world_rooms, join_world_room RPC, Realtime movement protocol & presence |
-| 31 | Social Plaza 3D map | TODO | - |
-| 32 | Player text chat & safety | TODO | - |
-| 33 | End-to-end, security, load QA | TODO | - |
-| 34 | Production docs and rollout | TODO | - |
+| 31 | Social Plaza 3D map | DONE | SocialPlazaScene, RemotePlayer interpolation, topic board, room switcher |
+| 32 | Player text chat & safety | DONE | RoomChatOverlay, DuoPracticeBanner, mute/block/report RPCs |
+| 33 | End-to-end, security, load QA | DONE | 20 test files / 124 tests passed, criticalSecurityFixes suite |
+| 34 | Production docs and rollout | DONE | DEPLOYMENT.md, ARCHITECTURE.md, QA_CHECKLIST.md, schema.sql bundle |
 | 35 | Voice/speaking enhancements (optional) | BACKLOG | - |
 
 **Prioritas pertama setelah roadmap ini:** kerjakan Blok 20, lalu Blok 21. Jangan mengerjakan map multiplayer di atas auth demo bersama.
@@ -779,5 +779,40 @@ Sebuah blok baru boleh diberi tanda DONE bila **semuanya** terpenuhi:
 - README.md juga perlu diselaraskan dengan auth Supabase, local guest mode, migrations, dan production deployment pada Blok 34 (sebagian setup bisa lebih awal).
 - Dokumen ini adalah technical implementation plan. Design UI, acceptance QA, privacy terms, dan operasional admin harus dilengkapi sepanjang pembangunan.
 
-**Last documented baseline:** 2026-11-03, main f8253f4.  
-**Current implementation change in this commit:** penambahan update.md saja; tidak ada feature code, Supabase schema migration, deployment, ataupun test execution yang diklaim selesai.
+---
+
+## Post-Implementation Critical Fix Audit — 2026-11-03
+
+### 1. Daftar Isu yang Ditemukan & Dikonfirmasi
+1. **Bypass Reward Lesson Klien (`complete_lesson_atomic`) & Pemanggilan Ganda:**
+   - Migrasi `20261103000003` mendefinisikan `public.complete_lesson_atomic(p_lesson_unit_id, p_score)` yang menerima skor langsung dari klien tanpa melalui mesin evaluasi soal.
+   - `LessonPage.tsx` memanggil `submitLessonAttempt` (`grade_lesson_attempt_atomic`) lalu memanggil `completeLesson` (`completeLessonReward` -> `complete_lesson_atomic`).
+   - `grade_lesson_attempt_atomic` sebelumnya memberi skor 100% apabila suatu lesson memiliki 0 soal `published`.
+2. **Penulisan Langsung Klien ke Tabel Progres & Ekonomi (`pushRemoteState` & RLS):**
+   - `20261103000002` memberi policy `INSERT`/`UPDATE`/`DELETE` langsung ke learner pada `lesson_progress`, dan `20260722000000` memberi policy `FOR ALL` (`*_owner`) pada `claimed_rewards`, `inventory_items`, dan `mission_progress`.
+   - `pushRemoteState()` di `src/lib/supabaseSync.ts` melakukan upsert langsung ke `profiles` (termasuk `coins`, `xp`, `level`), `lesson_progress`, `claimed_rewards`, `inventory_items`, dan `mission_progress` dari state browser.
+3. **Rekursi Tak Terhingga RLS pada `room_memberships` & Bypass Join Room di `useMultiplayerRoom`:**
+   - Policy `room_memberships_select_room` di `20261103000008` melakukan subquery ke `public.room_memberships` di dalam klausa `USING` tabel `public.room_memberships` sendiri.
+   - `useMultiplayerRoom.ts` mengabaikan nilai kembalian `joinWorldRoom()` sehingga tetap melakukan subscribe channel Realtime dan mengirim presence walaupun room penuh atau akses ditolak.
+4. **Keterkaitan Bank Soal Dinamis & Penanganan Error Grading (`LessonPage.tsx`):**
+   - `fetchCurriculumUnits()` sebelumnya belum memetakan relasi `curriculum_lessons.unit_id -> curriculum_units.id` ketika ID lesson berbeda dari ID unit, dan menyuntikkan soal hardcode ketika lesson database memiliki 0 soal.
+   - Blok `catch` di `LessonPage.tsx` sebelumnya mengubah kegagalan jaringan/RPC menjadi kelulusan lokal (`fallbackScore`) untuk pengguna terautentikasi.
+5. **Siklus Hidup Channel Chat & Verifikasi Objektif Misi (`useRoomChat.ts` & `ConversationPanel.tsx`):**
+   - `useRoomChat.ts` sebelumnya tidak memanggil `supabase.removeChannel` saat cleanup dan berbagi nama channel `room:<roomId>` dengan `useMultiplayerRoom.ts`.
+   - `claim_mission_reward_atomic` sebelumnya belum memverifikasi ketercapaian seluruh objektif misi di server.
+
+### 2. Perbaikan Kode & Migrasi Forward-Only yang Diterapkan
+- **Migrasi Database Baru (`supabase/migrations/` & `supabase/schema.sql`):**
+  - `20261103000010_fix_lesson_reward_security.sql`: Mencabut dan menghapus `public.complete_lesson_atomic(text, integer)`, memperketat `public.grade_lesson_attempt_atomic(text, jsonb)` dengan row lock `FOR UPDATE`, menolak lesson dengan 0 soal `published` (`ok: false, passed: false, score: 0`), serta mengembalikan `current_xp`, `current_level`, dan `completion_status`.
+  - `20261103000011_fix_lesson_progress_permissions.sql`: Menghapus policy write langsung learner pada `lesson_progress`, `claimed_rewards`, `inventory_items`, `mission_progress`, dan `lesson_attempts`; memperluas trigger `protect_profile_economy_fields` ke `BEFORE INSERT OR UPDATE ON public.profiles`; menambahkan trigger `seed_starter_player_data` dan `validate_avatar_config_ownership`.
+  - `20261103000012_fix_room_membership_rls.sql`: Mengganti policy RLS rekursif pada `room_memberships` dan `world_rooms` menggunakan helper `SECURITY DEFINER STABLE` (`get_my_active_room_id()`, `is_public_active_room()`), serta menambahkan row lock `FOR UPDATE` pada `join_world_room`.
+  - `20261103000013_harden_mission_reward_validation.sql`: Menambahkan tabel `mission_objective_definitions`, RPC `verify_mission_objective_atomic`, dan validasi kelengkapan objektif di dalam `claim_mission_reward_atomic`.
+- **Perbaikan Frontend & Repository:**
+  - `src/lib/economyRepository.ts`, `src/hooks/useDemoStorage.ts`, `src/lib/learningRepository.ts`, `src/pages/LessonPage.tsx`, `src/pages/LessonsPage.tsx`, `src/state/selectors.ts`, `src/state/demoReducer.ts`, `src/state/DemoContext.tsx`: Satu jalur grading otoritatif server, penghapusan fallback kelulusan palsu saat error RPC, dukungan unit/lesson dinamis, dan state eksplisit `idle | submitting | success | failed`.
+  - `src/lib/supabaseSync.ts`, `src/hooks/useDemoAuth.ts`: `pushRemoteState()` hanya menyinkronkan profil dasar dan `avatar_configs` yang tervalidasi kepemilikannya; `clearRemoteState()` diblokir untuk akun autentikasi.
+  - `src/lib/realtime/protocol.ts`, `src/hooks/useMultiplayerRoom.ts`, `src/hooks/useRoomChat.ts`, `src/components/world/RoomChatOverlay.tsx`, `src/pages/SocialPlazaPage.tsx`: Penegakan `joinRes.ok`, validasi batas dunia & `roomId` pada paket gerakan, pemisahan & pembersihan channel `room-chat:<roomId>`, dan status pesan `pending | sent | failed`.
+  - `src/components/world/ConversationPanel.tsx`: Integrasi `verifyMissionObjective` sebelum `claimMissionReward` tanpa fallback hadiah palsu ketika klaim server gagal.
+
+### 3. Hasil Pengujian & Batasan Jujur
+- **Unit & Regression Tests (Vitest):** 20 file tes / 124 tes lulus (`npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` seluruhnya keluar dengan kode `0`).
+- **Batasan Pengujian Saat Ini:** Pengujian otomatis di CI menggunakan mock Supabase client; pengujian integrasi terhadap instance PostgreSQL/Supabase live dan pengujian multi-browser Realtime untuk 2–5 pemain dilakukan pada proyek Supabase setelah migrasi `000010`–`000013` (atau `supabase/schema.sql`) dijalankan di Supabase SQL Editor.

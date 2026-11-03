@@ -5,6 +5,7 @@ import {
   fetchRemoteState,
   pushRemoteState,
   resolveHydratePayload,
+  sanitizeAvatarForInventory,
 } from "../../src/lib/supabaseSync";
 import { supabase } from "../../src/lib/supabaseClient";
 
@@ -81,15 +82,6 @@ describe("supabaseSync", () => {
           }),
         } as unknown as FromReturn;
       }
-      if (table === "avatar_configs") {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: null }),
-            }),
-          }),
-        } as unknown as FromReturn;
-      }
       if (table === "lesson_progress") {
         return {
           select: () => ({
@@ -113,26 +105,77 @@ describe("supabaseSync", () => {
     expect(result?.completedLessonIds).toEqual(["lesson-intro", "lesson-hobby"]);
   });
 
-  it("pushes remote state using atomic upserts without mass deleting rows", async () => {
-    const mockUpsert = vi.fn().mockResolvedValue({ error: null });
+  it("pushes ONLY profile metadata and sanitized avatar_configs without touching authoritative economy or progress tables", async () => {
+    const upsertedByTable = new Map<string, unknown>();
     const mockDelete = vi.fn();
 
-    vi.mocked(supabase!.from).mockReturnValue({
-      upsert: mockUpsert,
-      delete: mockDelete,
-    } as unknown as FromReturn);
+    vi.mocked(supabase!.from).mockImplementation((table: string) => {
+      return {
+        upsert: vi.fn().mockImplementation(async (payload: unknown) => {
+          upsertedByTable.set(table, payload);
+          return { error: null };
+        }),
+        delete: mockDelete,
+      } as unknown as FromReturn;
+    });
 
-    const state = {
-      ...createInitialState(true),
-      completedLessonIds: ["lesson-intro"],
+    const base = createInitialState(true);
+    const tamperedState = {
+      ...base,
+      user: {
+        ...base.user,
+        name: "Budi Learner",
+        username: "budi_learner",
+        coins: 999999,
+        xp: 999999,
+        level: 5,
+      },
+      avatar: {
+        ...base.avatar,
+        topId: "top-varsity", // Not in base.inventory!
+      },
+      completedLessonIds: ["lesson-intro", "lesson-hobby", "lesson-weekend"],
+      claimedRewards: ["intro", "hobby", "weekend"],
     };
 
-    await pushRemoteState("user-abc", state);
+    await pushRemoteState("user-abc", tamperedState);
 
-    // Verify .upsert was called for all domain entities
-    expect(mockUpsert).toHaveBeenCalled();
-    // Verify no mass wipe (.delete) occurred during push
+    // Only profiles and avatar_configs may be written from client sync
+    expect(Array.from(upsertedByTable.keys()).sort()).toEqual(["avatar_configs", "profiles"]);
+    expect(upsertedByTable.has("lesson_progress")).toBe(false);
+    expect(upsertedByTable.has("claimed_rewards")).toBe(false);
+    expect(upsertedByTable.has("inventory_items")).toBe(false);
+    expect(upsertedByTable.has("mission_progress")).toBe(false);
+
+    // Profile payload must NOT include coins, xp, or level
+    const profilePayload = upsertedByTable.get("profiles") as Record<string, unknown>;
+    expect(profilePayload.name).toBe("Budi Learner");
+    expect(profilePayload.username).toBe("budi_learner");
+    expect(profilePayload.coins).toBeUndefined();
+    expect(profilePayload.xp).toBeUndefined();
+    expect(profilePayload.level).toBeUndefined();
+
+    // Unowned avatar item (top-varsity) must be sanitized back to default owned top
+    const avatarPayload = upsertedByTable.get("avatar_configs") as Record<string, unknown>;
+    expect(avatarPayload.top_id).toBe("top-hoodie-lavender");
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it("sanitizes unowned avatar items while preserving owned store items", () => {
+    const base = createInitialState(true);
+    const unownedResult = sanitizeAvatarForInventory(
+      { ...base.avatar, topId: "top-varsity", accessoryId: "accessory-round-glasses" },
+      base.inventory,
+    );
+    expect(unownedResult.topId).toBe("top-hoodie-lavender");
+    expect(unownedResult.accessoryId).toBeNull();
+
+    const ownedResult = sanitizeAvatarForInventory(
+      { ...base.avatar, topId: "top-varsity", accessoryId: "accessory-round-glasses" },
+      [...base.inventory, "top-varsity", "accessory-round-glasses"],
+    );
+    expect(ownedResult.topId).toBe("top-varsity");
+    expect(ownedResult.accessoryId).toBe("accessory-round-glasses");
   });
 
   it("propagates errors when an upsert fails during pushRemoteState", async () => {
@@ -151,17 +194,14 @@ describe("supabaseSync", () => {
     await expect(pushRemoteState("user-err", state)).rejects.toThrow(/Gagal menyimpan profil remote/i);
   });
 
-  it("clears all user tables during clearRemoteState", async () => {
-    const mockEq = vi.fn().mockResolvedValue({ error: null });
-    const mockDelete = vi.fn().mockReturnValue({ eq: mockEq });
-
+  it("blocks destructive clearRemoteState for authenticated accounts", async () => {
+    const mockDelete = vi.fn();
     vi.mocked(supabase!.from).mockReturnValue({
       delete: mockDelete,
     } as unknown as FromReturn);
 
-    await clearRemoteState("user-reset");
-    expect(mockDelete).toHaveBeenCalled();
-    expect(mockEq).toHaveBeenCalledWith("user_id", "user-reset");
+    await expect(clearRemoteState("user-reset")).rejects.toThrow(/dinonaktifkan/i);
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 
   it("resolves hydrate payload with completed lesson IDs", async () => {
