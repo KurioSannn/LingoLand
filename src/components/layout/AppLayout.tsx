@@ -1,4 +1,4 @@
-import { BookOpen, Coins, Heart, Home, Sparkles, Store, User, Users } from "lucide-react";
+import { BookOpen, Coins, Heart, Home, Shield, Sparkles, Store, User, Users } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useDemoAuth } from "../../hooks/useDemoAuth";
@@ -18,7 +18,7 @@ const navItems = [
 ];
 
 export function AppLayout() {
-  const { currentUser, logout: endSession, resetProgress } = useDemoAuth();
+  const { currentUser, isAdmin, logout: endSession, resetProgress } = useDemoAuth();
   const navigate = useNavigate();
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
@@ -49,6 +49,12 @@ export function AppLayout() {
               {item.label}
             </NavLink>
           ))}
+          {isAdmin ? (
+            <NavLink to="/admin" className={({ isActive }) => `nav-link ${isActive ? "nav-link-active" : ""}`}>
+              <Shield size={18} />
+              Admin CMS
+            </NavLink>
+          ) : null}
         </nav>
 
         <div className="header-actions">
@@ -67,7 +73,12 @@ export function AppLayout() {
             {currentUser.hearts}
           </span>
           <NotificationButton />
-          <ProfileMenu userName={currentUser.name} onResetRequest={() => setIsResetModalOpen(true)} onLogout={logout} />
+          <ProfileMenu
+            userName={currentUser.name}
+            isAdmin={isAdmin}
+            onResetRequest={() => setIsResetModalOpen(true)}
+            onLogout={logout}
+          />
         </div>
       </header>
 

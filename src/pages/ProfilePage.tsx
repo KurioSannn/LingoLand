@@ -1,4 +1,4 @@
-import { CheckCircle2, Coins, Flame, Heart, LogOut, MessageCircle, Pencil, RotateCcw } from "lucide-react";
+import { CheckCircle2, Coins, Flame, Heart, LogOut, MessageCircle, Pencil, RotateCcw, Shield } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AvatarFigure } from "../components/ui/AvatarFigure";
@@ -15,7 +15,7 @@ import { useDemoStorage } from "../hooks/useDemoStorage";
 
 export function ProfilePage() {
   const navigate = useNavigate();
-  const { logout, resetProgress } = useDemoAuth();
+  const { isAdmin, logout, resetProgress } = useDemoAuth();
   const { state } = useDemoStorage();
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
@@ -43,7 +43,10 @@ export function ProfilePage() {
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
             <AvatarFigure avatar={state.avatar} size="large" label={`Avatar ${user.name}`} />
             <div>
-              <h1 className="text-3xl font-bold text-neutral-950">{user.name}</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-3xl font-bold text-neutral-950">{user.name}</h1>
+                {isAdmin ? <Badge tone="info">Administrator</Badge> : null}
+              </div>
               <p className="text-neutral-500">@{user.username}</p>
               <p className="mt-1 text-sm text-neutral-500">{user.email}</p>
             </div>
@@ -75,11 +78,17 @@ export function ProfilePage() {
             </li>
           </ul>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-8 flex flex-wrap gap-3">
             <Link to="/app/avatar" className="button button-primary">
               <Pencil size={16} aria-hidden />
               Edit Avatar
             </Link>
+            {isAdmin ? (
+              <Link to="/admin" className="button button-secondary">
+                <Shield size={16} aria-hidden />
+                Panel Admin (CMS)
+              </Link>
+            ) : null}
             <Button variant="secondary" onClick={() => setIsResetModalOpen(true)}>
               <RotateCcw size={16} aria-hidden />
               Reset Progres Belajar
@@ -100,10 +109,10 @@ export function ProfilePage() {
               </div>
               <Badge tone="prototype">Segera Hadir</Badge>
             </div>
-            <Button variant="secondary" className="mt-4 w-full" onClick={() => navigate("/app/avatar-chat")}>
+            <Link to="/app/avatar-chat" className="button button-secondary mt-4 w-full">
               <MessageCircle size={16} aria-hidden />
-              Buka Percakapan
-            </Button>
+              Buka Chat Avatar
+            </Link>
           </Card>
 
           <Card>
@@ -111,14 +120,14 @@ export function ProfilePage() {
             {completedMissions.length > 0 ? (
               <ul className="mt-4 flex flex-col gap-3">
                 {completedMissions.map((mission) => (
-                  <li key={mission.id} className="flex items-center gap-2 text-sm text-neutral-700">
-                    <CheckCircle2 size={16} className="shrink-0 text-success-500" aria-hidden />
-                    {mission.title}
+                  <li key={mission.id} className="flex items-center justify-between text-sm">
+                    <span className="font-semibold text-neutral-700">{mission.title}</span>
+                    <Badge tone="success">+{mission.rewardXp} XP</Badge>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-4 text-sm text-neutral-500">Belum ada misi yang selesai. Mulai dari Perkenalan Diri di Mini Home.</p>
+              <p className="mt-4 text-sm text-neutral-500">Belum ada misi yang diselesaikan.</p>
             )}
           </Card>
 

@@ -1,14 +1,15 @@
-import { LogOut, RotateCcw, User } from "lucide-react";
+import { LogOut, RotateCcw, Shield, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDismissable } from "../../hooks/useDismissable";
 
 interface ProfileMenuProps {
   userName: string;
+  isAdmin?: boolean;
   onResetRequest: () => void;
   onLogout: () => void;
 }
 
-export function ProfileMenu({ userName, onResetRequest, onLogout }: ProfileMenuProps) {
+export function ProfileMenu({ userName, isAdmin, onResetRequest, onLogout }: ProfileMenuProps) {
   const navigate = useNavigate();
   const { isOpen, setIsOpen, containerRef } = useDismissable<HTMLDivElement>();
 
@@ -37,6 +38,12 @@ export function ProfileMenu({ userName, onResetRequest, onLogout }: ProfileMenuP
             <User size={16} />
             Profil Saya
           </button>
+          {isAdmin ? (
+            <button className="menu-item text-primary-600 font-semibold" type="button" role="menuitem" onClick={() => select(() => navigate("/admin"))}>
+              <Shield size={16} />
+              Panel Admin (CMS)
+            </button>
+          ) : null}
           <button className="menu-item" type="button" role="menuitem" onClick={() => select(onResetRequest)}>
             <RotateCcw size={16} />
             Reset Progres Belajar

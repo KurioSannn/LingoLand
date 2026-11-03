@@ -51,6 +51,7 @@ export function App() {
         <Route path="store" element={<StorePage />} />
         <Route path="topup" element={<TopUpPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="admin" element={<Navigate to="/admin" replace />} />
       </Route>
       <Route
         path="/admin"

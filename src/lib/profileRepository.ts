@@ -16,17 +16,29 @@ export async function fetchUserRole(userId: string): Promise<UserRole> {
   }
 
   try {
-    const { data, error } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .maybeSingle();
+    const query = supabase.from("user_roles").select("role").eq("user_id", userId);
+    const res = (await Promise.resolve(query)) as {
+      data?: Array<{ role?: string }> | { role?: string } | null;
+      error?: unknown;
+    };
 
-    if (error || !data?.role) {
+    if (res && "data" in res && Array.isArray(res.data)) {
+      const roles = res.data.map((r) => r.role);
+      if (roles.includes("admin")) return "admin";
+      if (roles.includes("moderator")) return "moderator";
+      if (roles.includes("user")) return "user";
       return "user";
     }
 
-    return data.role as UserRole;
+    if (typeof query.maybeSingle === "function") {
+      const { data, error } = await query.maybeSingle();
+      if (error || !data?.role) {
+        return "user";
+      }
+      return data.role as UserRole;
+    }
+
+    return "user";
   } catch {
     return "user";
   }
